@@ -18,8 +18,6 @@ public class ThirdPersonCamera : MonoBehaviour
 
     public float yaw = 0f;
     public bool isSettingsOpen = false;
-
-    private InventoryManager inventoryManager;
     private float yawVelocity = 0f;
     private float pitchVelocity = 0f;
     
@@ -29,25 +27,12 @@ public class ThirdPersonCamera : MonoBehaviour
     private void Awake()
     {
         cachedTransform = transform;
-        InitializeComponents();
-    }
-
-    private void InitializeComponents()
-    {
-        inventoryManager ??= Object.FindFirstObjectByType<InventoryManager>();
-        if (!inventoryManager) Debug.LogError("InventoryManager not found!");
     }
 
     private void LateUpdate()
     {
-        bool isInventoryOpen = inventoryManager?.IsInventoryOpen ?? false;
         float deltaTime = Time.deltaTime;
-
-        if (!isInventoryOpen && !isSettingsOpen)
-        {
-            HandleInput(deltaTime);
-        }
-
+        HandleInput(deltaTime);
         UpdateRotation(deltaTime);
         UpdatePosition(deltaTime);
     }

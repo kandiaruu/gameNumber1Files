@@ -2,49 +2,45 @@ using UnityEngine;
 
 public class ThirdPersonCharacter : MonoBehaviour
 {
-    [SerializeField] private float moveSpeed = 5f; // Скорость обычного движения
-    [SerializeField] private float sprintSpeed = 10f; // Скорость бега
-    [SerializeField] private float rotationSpeed = 10f; // Скорость поворота
-    [SerializeField] private float jumpForce = 10f; // Сила прыжка
-    [SerializeField] private float groundCheckDistance = 0.2f; // Расстояние проверки земли
-    [SerializeField] private float maxStamina = 100f; // Максимальная выносливость
-    [SerializeField] private float staminaDrainRate = 20f; // Скорость расхода выносливости при беге
-    [SerializeField] private float staminaRegenRate = 1.67f; // Скорость восстановления выносливости
-    [SerializeField] private float staminaRegenDelay = 15f; // Задержка перед началом восстановления
+    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float sprintSpeed = 10f;
+    [SerializeField] private float rotationSpeed = 10f;
+    [SerializeField] private float jumpForce = 10f;
+    [SerializeField] private float groundCheckDistance = 0.2f;
+    [SerializeField] private float maxStamina = 100f;
+    [SerializeField] private float staminaDrainRate = 20f;
+    [SerializeField] private float staminaRegenRate = 1.67f;
+    [SerializeField] private float staminaRegenDelay = 15f;
 
-    public ThirdPersonCamera cameraController; // Ссылка на контроллер камеры
-    private Rigidbody rb; // Компонент физики
-    private InventoryManager inventoryManager; // Ссылка на менеджер инвентаря
-    private Vector3 moveVelocity; // Вектор скорости движения
-    private bool isGrounded; // Находится ли персонаж на земле
-    private float currentStamina; // Текущая выносливость
-    private float timeSinceLastSprint; // Время с последнего бега
+    public ThirdPersonCamera cameraController;
+    private Rigidbody rb;
+    private Vector3 moveVelocity;
+    private bool isGrounded;
+    private float currentStamina;
+    private float timeSinceLastSprint;
 
-    private static readonly Vector3 GroundCheckOffset = Vector3.up * 0.1f; // Смещение для проверки земли
-    private static readonly KeyCode[] MovementKeys = { KeyCode.A, KeyCode.S, KeyCode.D }; // Клавиши движения
+    private static readonly Vector3 GroundCheckOffset = Vector3.up * 0.1f;
+    private static readonly KeyCode[] MovementKeys = { KeyCode.A, KeyCode.S, KeyCode.D, KeyCode.W };
 
     private void Awake()
     {
         InitializeComponents();
-        currentStamina = maxStamina; // Инициализация выносливости
-        timeSinceLastSprint = staminaRegenDelay; // Установка начального времени для восстановления
+        currentStamina = maxStamina;
+        timeSinceLastSprint = staminaRegenDelay;
     }
 
     private void InitializeComponents()
     {
         rb = GetComponent<Rigidbody>();
-        if (!rb) Debug.LogError("Не найден компонент Rigidbody!");
+        if (!rb) Debug.LogError("No Rigidbody component found!");
 
         cameraController ??= Object.FindFirstObjectByType<ThirdPersonCamera>();
-        if (!cameraController) Debug.LogError("Не найдена ThirdPersonCamera!");
-
-        inventoryManager ??= Object.FindFirstObjectByType<InventoryManager>();
-        if (!inventoryManager) Debug.LogError("Не найден InventoryManager!");
+        if (!cameraController) Debug.LogError("No ThirdPersonCamera found!");
     }
 
     private void Update()
     {
-        // Логика восстановления выносливости работает всегда, даже если инвентарь открыт
+        // Stamina regeneration
         if (!Input.GetKey(KeyCode.LeftShift) || currentStamina <= 0)
         {
             timeSinceLastSprint += Time.deltaTime;
@@ -54,9 +50,7 @@ public class ThirdPersonCharacter : MonoBehaviour
             }
         }
 
-        // Управление прыжком и движением отключается при открытом инвентаре
-        if (inventoryManager?.IsInventoryOpen ?? false) return;
-
+        // Jump handling
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             Jump();
@@ -65,21 +59,19 @@ public class ThirdPersonCharacter : MonoBehaviour
 
     private void FixedUpdate()
     {
-        bool isInventoryOpen = inventoryManager?.IsInventoryOpen ?? false;
+        // Ground check
         isGrounded = Physics.Raycast(transform.position + GroundCheckOffset, 
             Vector3.down, groundCheckDistance + 0.1f);
 
+        // Handle movement and rotation
         Vector3 inputDirection = GetInputDirection();
-        
-        if (!isInventoryOpen)
-        {
-            Move(inputDirection);
-            Rotate(inputDirection);
-        }
-        else
+        Move(inputDirection);
+        Rotate(inputDirection);
+
+        // If no input, dampen movement
+        if (inputDirection.sqrMagnitude < 0.01f)
         {
             DampenMovement();
-            SyncRotationWithCamera();
         }
     }
 
@@ -108,11 +100,6 @@ public class ThirdPersonCharacter : MonoBehaviour
 
             Vector3 moveDirection = Quaternion.Euler(0, cameraController.yaw, 0) * inputDirection;
             moveVelocity = moveDirection * speed;
-            rb.linearVelocity = new Vector3(moveVelocity.x, rb.linearVelocity.y, moveVelocity.z);
-        }
-        else
-        {
-            moveVelocity = Vector3.Lerp(moveVelocity, Vector3.zero, deltaTime * 5f);
             rb.linearVelocity = new Vector3(moveVelocity.x, rb.linearVelocity.y, moveVelocity.z);
         }
     }
@@ -144,14 +131,6 @@ public class ThirdPersonCharacter : MonoBehaviour
             if (Input.GetKey(key)) return true;
         }
         return false;
-    }
-
-    private void SyncRotationWithCamera()
-    {
-        float deltaTime = Time.fixedDeltaTime;
-        Quaternion targetRotation = Quaternion.Euler(0, cameraController.yaw, 0);
-        transform.rotation = Quaternion.Slerp(transform.rotation, 
-            targetRotation, rotationSpeed * deltaTime);
     }
 
     private void DampenMovement()
