@@ -1,6 +1,6 @@
-    using UnityEngine;
-    using UnityEngine.UI;
-    using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 [System.Serializable]
 public class Skill
@@ -18,6 +18,10 @@ public class Skill
     [System.NonSerialized] public bool isShaking = false;
     [System.NonSerialized] private Image lockImage;
     [System.NonSerialized] private Color originalColor;
+
+    public GameObject questionIcon; // Новый объект для знака ?
+    [System.NonSerialized] public bool hasQuestionState = false; // Флаг состояния ?
+    public int questionGoldCost = 5; // Индивидуальная стоимость золота для покупки ?
 
     [TextArea] public string description;
     public string[] characteristics;
@@ -37,12 +41,13 @@ public class Skill
     public void UpdateUI(bool canAfford, Skill[] allSkills)
     {
         bool canUnlock = CanUnlock(allSkills);
-        lockIcon.SetActive(!isUnlocked && !canUnlock);
+        lockIcon.SetActive(!isUnlocked && hasQuestionState && !canUnlock); // Замок появляется только после ? и если условия не выполнены
+        questionIcon.SetActive(!isUnlocked && !hasQuestionState); // ? показывается, если не куплено и навык не разблокирован
 
         TextMeshProUGUI buttonText = skillButton.GetComponentInChildren<TextMeshProUGUI>();
         if (isUnlocked) buttonText.text = "Разблокировано";
-        else if (canUnlock) buttonText.text = cost.ToString();
-        else buttonText.text = "";
+        else if (canUnlock && hasQuestionState) buttonText.text = cost.ToString(); // Текст стоимости отображается только после покупки ?
+        else buttonText.text = ""; // Если ? не куплен, текст пустой
     }
 
     public void ShakeLockIcon(MonoBehaviour manager)

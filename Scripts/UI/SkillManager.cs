@@ -15,6 +15,10 @@ public class SkillTreeManager : MonoBehaviour
     [SerializeField] private GameObject tooltipPanel;
     [SerializeField] private TextMeshProUGUI tooltipText;
 
+    [SerializeField] private int gold = 10; // Начальное количество золота
+    [SerializeField] private TextMeshProUGUI goldText; // UI для отображения золота
+    [SerializeField] private Button resetQuestionsButton; // Новая кнопка для сброса вопросов и золота
+
     private bool isTooltipActive = false;
     private RectTransform tooltipRect;
     [SerializeField] private float TOOLTIP_OFFSET_X = 500f; // Фиксированный отступ справа от курсора
@@ -41,7 +45,11 @@ public class SkillTreeManager : MonoBehaviour
         resetButton.onClick.AddListener(ResetSkills);
         if (skillPointsText == null) Debug.LogError("Текст очков навыков не назначен!");
         UpdateSkillPointsUI();
+        UpdateGoldUI();
         RefreshAllSkills();
+
+        if (resetQuestionsButton == null) Debug.LogError("Кнопка сброса вопросов не назначена!");
+        resetQuestionsButton.onClick.AddListener(ResetQuestionsAndGold); // Привязываем метод к кнопке
 
         if (tooltipPanel != null)
         {
@@ -86,19 +94,16 @@ public class SkillTreeManager : MonoBehaviour
         if (isTooltipActive && tooltipPanel != null && tooltipRect != null)
         {
             Vector3 mousePosition = Input.mousePosition;
-            Vector3 targetPosition = new Vector3(mousePosition.x + TOOLTIP_OFFSET_X, mousePosition.y, 0f); // Фиксированный отступ справа
+            Vector3 targetPosition = new Vector3(mousePosition.x + TOOLTIP_OFFSET_X, mousePosition.y, 0f);
 
             Vector2 tooltipSize = tooltipRect.sizeDelta;
 
-            // Корректировка, если тултип выходит за правую границу
             if (targetPosition.x + tooltipSize.x > Screen.width)
             {
-                targetPosition.x = Screen.width - tooltipSize.x; // Прижимаем к правому краю
+                targetPosition.x = Screen.width - tooltipSize.x;
             }
-            // Корректировка по Y
             targetPosition.y = Mathf.Clamp(targetPosition.y, tooltipSize.y, Screen.height);
 
-            // Плавное перемещение
             tooltipRect.position = Vector3.Lerp(tooltipRect.position, targetPosition, Time.unscaledDeltaTime * 15f);
         }
     }
@@ -106,7 +111,7 @@ public class SkillTreeManager : MonoBehaviour
     public void OnPointerEnter(Skill skill)
     {
         Debug.Log("OnPointerEnter вызван для " + skill.skillName);
-        if (tooltipPanel != null && tooltipText != null && !isTooltipActive)
+        if (tooltipPanel != null && tooltipText != null && !isTooltipActive && !skill.questionIcon.activeSelf)
         {
             isTooltipActive = true;
             tooltipPanel.SetActive(true);
@@ -118,14 +123,13 @@ public class SkillTreeManager : MonoBehaviour
                                    $"Макс. улучшений: {skill.maxUpgrades}";
             tooltipText.text = tooltipContent;
 
-            // Начальная позиция справа от курсора
             Vector3 mousePosition = Input.mousePosition;
             Vector3 initialPosition = new Vector3(mousePosition.x + TOOLTIP_OFFSET_X, mousePosition.y, 0f);
 
             Vector2 tooltipSize = tooltipRect.sizeDelta;
             if (initialPosition.x + tooltipSize.x > Screen.width)
             {
-                initialPosition.x = Screen.width - tooltipSize.x; // Прижимаем к правому краю, если не помещается
+                initialPosition.x = Screen.width - tooltipSize.x;
             }
             initialPosition.y = Mathf.Clamp(initialPosition.y, tooltipSize.y, Screen.height);
 
@@ -155,6 +159,16 @@ public class SkillTreeManager : MonoBehaviour
         {
             skill.isUnlocked = false;
 
+            if (skill.skillIndex == 0) // Первый навык с индексом 0 не требует покупки ?
+            {
+                skill.hasQuestionState = true; // Сразу доступен для просмотра
+                if (skill.questionIcon != null)
+                {
+                    skill.questionIcon.SetActive(false); // Скрываем ? для первого навыка
+                }
+                Debug.Log($"Навык {skill.skillName} (индекс 0) изначально открыт для просмотра (без покупки ?).");
+            }
+
             if (skill.lockIcon != null)
             {
                 skill.originalPosition = skill.lockIcon.GetComponent<RectTransform>().anchoredPosition;
@@ -163,6 +177,7 @@ public class SkillTreeManager : MonoBehaviour
                 {
                     Debug.LogError($"Transform для lockIcon {skill.lockIcon.name} у {skill.skillName} равен null!");
                 }
+                skill.lockIcon.SetActive(false); // Изначально скрываем замок
             }
             else
             {
@@ -176,7 +191,13 @@ public class SkillTreeManager : MonoBehaviour
             else
             {
                 skill.skillButton.onClick.RemoveAllListeners();
-                skill.skillButton.onClick.AddListener(() => UnlockSkill(skill.skillIndex));
+                skill.skillButton.onClick.AddListener(() =>
+                {
+                    if (!skill.isUnlocked && skill.questionIcon.activeSelf)
+                        Instance.BuyQuestionState(skill.skillIndex); // Покупка ? если он активен
+                    else if (!skill.isUnlocked)
+                        UnlockSkill(skill.skillIndex); // Стандартная разблокировка
+                });
             }
         }
     }
@@ -216,6 +237,59 @@ public class SkillTreeManager : MonoBehaviour
     private void UpdateSkillPointsUI()
     {
         skillPointsText.text = $"Очки навыков: {skillPoints}";
+    }
+
+    private void UpdateGoldUI()
+    {
+        if (goldText != null)
+            goldText.text = $"Золото: {gold}";
+        else
+            Debug.LogError("Текст золота не назначен!");
+    }
+
+    public void BuyQuestionState(int skillIndex)
+    {
+        Skill skill = skills.FirstOrDefault(s => s.skillIndex == skillIndex);
+        if (skill == null)
+        {
+            Debug.LogError($"Навык с индексом {skillIndex} не найден");
+            return;
+        }
+
+        if (!skill.hasQuestionState)
+        {
+            if (gold < skill.questionGoldCost)
+            {
+                skill.ShakeLockIcon(this);
+                return;
+            }
+
+            gold -= skill.questionGoldCost;
+            skill.hasQuestionState = true;
+            UpdateGoldUI();
+            RefreshAllSkills();
+
+            // Немедленно вызываем OnPointerEnter, чтобы показать tooltip после покупки ?
+            OnPointerEnter(skill);
+        }
+    }
+
+    // Обновлённый метод для сброса вопросов и возврата золота, исключая навык с индексом 0
+    private void ResetQuestionsAndGold()
+    {
+        int goldToReturn = 0;
+        foreach (var skill in skills)
+        {
+            if (skill.skillIndex != 0 && skill.hasQuestionState) // Пропускаем навык с индексом 0
+            {
+                goldToReturn += skill.questionGoldCost; // Суммируем золото, потраченное на вопросы
+                skill.hasQuestionState = false; // Сбрасываем состояние вопроса
+            }
+        }
+        gold += goldToReturn; // Возвращаем золото
+        UpdateGoldUI();
+        RefreshAllSkills(); // Обновляем UI навыков
+        Debug.Log($"Сброшены все вопросы (кроме Sprint). Возвращено золота: {goldToReturn}");
     }
 
     private void RefreshAllSkills()
