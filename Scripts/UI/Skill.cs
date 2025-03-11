@@ -1,12 +1,12 @@
-using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
+    using UnityEngine;
+    using UnityEngine.UI;
+    using TMPro;
 
 [System.Serializable]
 public class Skill
 {
     public string skillName;
-    public int skillIndex; // Новое поле для задания индекса в инспекторе
+    public int skillIndex;
     public int cost;
     public bool isUnlocked;
     public int[] prerequisiteIndices;
@@ -19,17 +19,17 @@ public class Skill
     [System.NonSerialized] private Image lockImage;
     [System.NonSerialized] private Color originalColor;
 
+    [TextArea] public string description;
+    public string[] characteristics;
+    public int maxUpgrades;
+
     public bool CanUnlock(Skill[] allSkills)
     {
         if (isUnlocked) return false;
         foreach (int index in prerequisiteIndices)
         {
-            // Ищем навык с соответствующим skillIndex
             Skill prereqSkill = System.Array.Find(allSkills, s => s.skillIndex == index);
-            if (prereqSkill == null || !prereqSkill.isUnlocked)
-            {
-                return false;
-            }
+            if (prereqSkill == null || !prereqSkill.isUnlocked) return false;
         }
         return true;
     }
@@ -37,21 +37,12 @@ public class Skill
     public void UpdateUI(bool canAfford, Skill[] allSkills)
     {
         bool canUnlock = CanUnlock(allSkills);
-        lockIcon.SetActive(!isUnlocked && !canUnlock); // Иконка замка видна, если навык не разблокирован и условия не выполнены
+        lockIcon.SetActive(!isUnlocked && !canUnlock);
 
         TextMeshProUGUI buttonText = skillButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (isUnlocked)
-        {
-            buttonText.text = "Unlocked"; // Если навык разблокирован, показываем "Unlocked"
-        }
-        else if (canUnlock)
-        {
-            buttonText.text = cost.ToString(); // Если навык можно разблокировать, показываем его стоимость
-        }
-        else
-        {
-            buttonText.text = ""; // Если условия не выполнены, текст пустой
-        }
+        if (isUnlocked) buttonText.text = "Разблокировано";
+        else if (canUnlock) buttonText.text = cost.ToString();
+        else buttonText.text = "";
     }
 
     public void ShakeLockIcon(MonoBehaviour manager)
@@ -60,7 +51,7 @@ public class Skill
         if (lockImage == null) lockImage = lockIcon.GetComponent<Image>();
         if (lockImage == null)
         {
-            Debug.LogError($"No Image component found on {lockIcon.name} for {skillName}!");
+            Debug.LogError($"Компонент Image не найден на {lockIcon.name} для {skillName}!");
             return;
         }
         originalColor = lockImage.color;
