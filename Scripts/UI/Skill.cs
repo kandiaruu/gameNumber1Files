@@ -13,6 +13,7 @@ public class Skill
     public Button skillButton;
     public GameObject lockIcon;
 
+    [SerializeField] private SkillTreeNavigation skillTreeNavigation; // Ссылка на скрипт SkillTreeNavigation
     [System.NonSerialized] public Vector3 originalPosition;
     [System.NonSerialized] public RectTransform lockIconTransform;
     [System.NonSerialized] public bool isShaking = false;
