@@ -22,6 +22,7 @@ public class Skill
 
     public GameObject questionIcon; // Новый объект для знака ?
     [System.NonSerialized] public bool hasQuestionState = false; // Флаг состояния ?
+    [SerializeField] public bool hasQuestionByDefault = false;
     public int questionGoldCost = 5; // Индивидуальная стоимость золота для покупки ?
 
     [TextArea] public string description;

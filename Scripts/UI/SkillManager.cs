@@ -14,14 +14,17 @@ public class SkillTreeManager : MonoBehaviour
     [SerializeField] private int skillPoints = 3;
     [SerializeField] private GameObject tooltipPanel;
     [SerializeField] private TextMeshProUGUI tooltipText;
+    [SerializeField] private SkillTreeNavigation skillTreeNavigation; // Ссылка на SkillTreeNavigation
 
-    [SerializeField] private int gold = 10; // Начальное количество золота
-    [SerializeField] private TextMeshProUGUI goldText; // UI для отображения золота
-    [SerializeField] private Button resetQuestionsButton; // Новая кнопка для сброса вопросов и золота
+    [SerializeField] private int gold = 10;
+    [SerializeField] private TextMeshProUGUI goldText;
+    [SerializeField] private Button resetQuestionsButton;
 
     private bool isTooltipActive = false;
     private RectTransform tooltipRect;
-    [SerializeField] private float TOOLTIP_OFFSET_X = 500f; // Фиксированный отступ справа от курсора
+    [SerializeField] private float TOOLTIP_OFFSET_X = 500f;
+    private Skill lastHoveredSkill; // Сохраняем последний навык, над которым был курсор
+    private bool wasDraggingLastFrame = false; // Отслеживаем состояние перетаскивания в предыдущем кадре
 
     private void Awake()
     {
@@ -49,7 +52,7 @@ public class SkillTreeManager : MonoBehaviour
         RefreshAllSkills();
 
         if (resetQuestionsButton == null) Debug.LogError("Кнопка сброса вопросов не назначена!");
-        resetQuestionsButton.onClick.AddListener(ResetQuestionsAndGold); // Привязываем метод к кнопке
+        resetQuestionsButton.onClick.AddListener(ResetQuestionsAndGold);
 
         if (tooltipPanel != null)
         {
@@ -67,6 +70,11 @@ public class SkillTreeManager : MonoBehaviour
         else
         {
             Debug.LogError("tooltipPanel не назначен в инспекторе!");
+        }
+
+        if (skillTreeNavigation == null)
+        {
+            Debug.LogError("SkillTreeNavigation не назначен в инспекторе!");
         }
 
         foreach (var skill in skills)
@@ -91,27 +99,58 @@ public class SkillTreeManager : MonoBehaviour
 
     private void Update()
     {
-        if (isTooltipActive && tooltipPanel != null && tooltipRect != null)
+        if (skillTreeNavigation != null)
         {
-            Vector3 mousePosition = Input.mousePosition;
-            Vector3 targetPosition = new Vector3(mousePosition.x + TOOLTIP_OFFSET_X, mousePosition.y, 0f);
-
-            Vector2 tooltipSize = tooltipRect.sizeDelta;
-
-            if (targetPosition.x + tooltipSize.x > Screen.width)
+            // Если идет перетаскивание и tooltip активен, скрываем его
+            if (skillTreeNavigation.isDragging && isTooltipActive)
             {
-                targetPosition.x = Screen.width - tooltipSize.x;
+                isTooltipActive = false;
+                tooltipPanel.SetActive(false);
             }
-            targetPosition.y = Mathf.Clamp(targetPosition.y, tooltipSize.y, Screen.height);
+            // Проверяем, закончилось ли перетаскивание в этом кадре
+            else if (wasDraggingLastFrame && !skillTreeNavigation.isDragging)
+            {
+                // Проверяем все навыки на наличие курсора над кнопкой
+                foreach (var skill in skills)
+                {
+                    if (skill.skillButton != null && 
+                        RectTransformUtility.RectangleContainsScreenPoint(
+                            skill.skillButton.GetComponent<RectTransform>(), 
+                            Input.mousePosition))
+                    {
+                        lastHoveredSkill = skill;
+                        OnPointerEnter(skill);
+                        break; // Выходим после нахождения первого подходящего навыка
+                    }
+                }
+            }
+            // Обновляем позицию tooltip только если он активен и нет перетаскивания
+            else if (isTooltipActive && tooltipPanel != null && tooltipRect != null && !skillTreeNavigation.isDragging)
+            {
+                Vector3 mousePosition = Input.mousePosition;
+                Vector3 targetPosition = new Vector3(mousePosition.x + TOOLTIP_OFFSET_X, mousePosition.y, 0f);
 
-            tooltipRect.position = Vector3.Lerp(tooltipRect.position, targetPosition, Time.unscaledDeltaTime * 15f);
+                Vector2 tooltipSize = tooltipRect.sizeDelta;
+
+                if (targetPosition.x + tooltipSize.x > Screen.width)
+                {
+                    targetPosition.x = Screen.width - tooltipSize.x;
+                }
+                targetPosition.y = Mathf.Clamp(targetPosition.y, tooltipSize.y, Screen.height);
+
+                tooltipRect.position = Vector3.Lerp(tooltipRect.position, targetPosition, Time.unscaledDeltaTime * 15f);
+            }
+
+            // Обновляем состояние перетаскивания для следующего кадра
+            wasDraggingLastFrame = skillTreeNavigation.isDragging;
         }
     }
 
     public void OnPointerEnter(Skill skill)
     {
         Debug.Log("OnPointerEnter вызван для " + skill.skillName);
-        if (tooltipPanel != null && tooltipText != null && !isTooltipActive && !skill.questionIcon.activeSelf)
+        if (tooltipPanel != null && tooltipText != null && !isTooltipActive && !skill.questionIcon.activeSelf && 
+            (skillTreeNavigation == null || !skillTreeNavigation.isDragging))
         {
             isTooltipActive = true;
             tooltipPanel.SetActive(true);
@@ -134,6 +173,9 @@ public class SkillTreeManager : MonoBehaviour
             initialPosition.y = Mathf.Clamp(initialPosition.y, tooltipSize.y, Screen.height);
 
             tooltipRect.position = initialPosition;
+
+            // Сохраняем последний навык, над которым был курсор
+            lastHoveredSkill = skill;
         }
     }
 
@@ -159,14 +201,15 @@ public class SkillTreeManager : MonoBehaviour
         {
             skill.isUnlocked = false;
 
-            if (skill.skillIndex == 0) // Первый навык с индексом 0 не требует покупки ?
+            // Устанавливаем начальное состояние ? на основе значения из инспектора
+            skill.hasQuestionState = !skill.hasQuestionByDefault;
+            if (skill.questionIcon != null)
             {
-                skill.hasQuestionState = true; // Сразу доступен для просмотра
-                if (skill.questionIcon != null)
-                {
-                    skill.questionIcon.SetActive(false); // Скрываем ? для первого навыка
-                }
-                Debug.Log($"Навык {skill.skillName} (индекс 0) изначально открыт для просмотра (без покупки ?).");
+                skill.questionIcon.SetActive(!skill.hasQuestionState && !skill.isUnlocked); // ? виден только если не куплен и навык не разблокирован
+            }
+            else
+            {
+                Debug.LogError($"Иконка вопроса для {skill.skillName} не назначена!");
             }
 
             if (skill.lockIcon != null)
@@ -274,24 +317,23 @@ public class SkillTreeManager : MonoBehaviour
         }
     }
 
-    // Обновлённый метод для сброса вопросов и возврата золота, исключая навык с индексом 0
     private void ResetQuestionsAndGold()
     {
         int goldToReturn = 0;
         foreach (var skill in skills)
         {
-            if (skill.skillIndex != 0 && skill.hasQuestionState) // Пропускаем навык с индексом 0
+            // Сбрасываем только купленные "?" (не изначальные) для заблокированных навыков
+            if (!skill.isUnlocked && skill.hasQuestionState && skill.hasQuestionByDefault)
             {
-                goldToReturn += skill.questionGoldCost; // Суммируем золото, потраченное на вопросы
+                goldToReturn += skill.questionGoldCost; // Суммируем золото, потраченное на покупку "?"
                 skill.hasQuestionState = false; // Сбрасываем состояние вопроса
             }
         }
         gold += goldToReturn; // Возвращаем золото
         UpdateGoldUI();
         RefreshAllSkills(); // Обновляем UI навыков
-        Debug.Log($"Сброшены все вопросы (кроме Sprint). Возвращено золота: {goldToReturn}");
+        Debug.Log($"Сброшены купленные вопросы для заблокированных навыков. Возвращено золота: {goldToReturn}");
     }
-
     private void RefreshAllSkills()
     {
         foreach (var skill in skills)
