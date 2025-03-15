@@ -113,9 +113,9 @@ public class SkillTreeManager : MonoBehaviour
                 // Проверяем все навыки на наличие курсора над кнопкой
                 foreach (var skill in skills)
                 {
-                    if (skill.skillButton != null && 
+                    if (skill.skillButton != null &&
                         RectTransformUtility.RectangleContainsScreenPoint(
-                            skill.skillButton.GetComponent<RectTransform>(), 
+                            skill.skillButton.GetComponent<RectTransform>(),
                             Input.mousePosition))
                     {
                         lastHoveredSkill = skill;
@@ -149,11 +149,12 @@ public class SkillTreeManager : MonoBehaviour
     public void OnPointerEnter(Skill skill)
     {
         Debug.Log("OnPointerEnter вызван для " + skill.skillName);
-        if (tooltipPanel != null && tooltipText != null && !isTooltipActive && !skill.questionIcon.activeSelf && 
+        if (tooltipPanel != null && tooltipText != null && !isTooltipActive && !skill.questionIcon.activeSelf &&
             (skillTreeNavigation == null || !skillTreeNavigation.isDragging))
         {
             isTooltipActive = true;
             tooltipPanel.SetActive(true);
+            Debug.Log("Tooltip активирован");
             Canvas.ForceUpdateCanvases();
 
             string tooltipContent = $"Навык: {skill.skillName}\n" +

@@ -10,6 +10,9 @@ public class Skill
     public int cost;
     public bool isUnlocked;
     public int[] prerequisiteIndices;
+
+    [SerializeField] private int requiredPrerequisiteCount; // Новое поле: сколько требований нужно выполнить
+
     public Button skillButton;
     public GameObject lockIcon;
 
@@ -22,22 +25,39 @@ public class Skill
 
     public GameObject questionIcon; // Новый объект для знака ?
     [System.NonSerialized] public bool hasQuestionState = false; // Флаг состояния ?
-    [SerializeField] public bool hasQuestionByDefault = false;
+    [SerializeField] public bool hasQuestionByDefault = true; // Флаг по умолчанию для ?
     public int questionGoldCost = 5; // Индивидуальная стоимость золота для покупки ?
 
     [TextArea] public string description;
     public string[] characteristics;
     public int maxUpgrades;
 
+    // Конструктор для установки начального значения requiredPrerequisiteCount
+    public Skill()
+    {
+        // Устанавливаем значение по умолчанию в конструкторе
+        requiredPrerequisiteCount = prerequisiteIndices != null ? prerequisiteIndices.Length : 0;
+    }
+
     public bool CanUnlock(Skill[] allSkills)
     {
         if (isUnlocked) return false;
+
+        if (prerequisiteIndices.Length == 0) return true; // Если нет требований, навык можно разблокировать
+
+        // Подсчитываем количество разблокированных обязательных навыков
+        int unlockedCount = 0;
         foreach (int index in prerequisiteIndices)
         {
             Skill prereqSkill = System.Array.Find(allSkills, s => s.skillIndex == index);
-            if (prereqSkill == null || !prereqSkill.isUnlocked) return false;
+            if (prereqSkill != null && prereqSkill.isUnlocked)
+            {
+                unlockedCount++;
+            }
         }
-        return true;
+
+        // Сравниваем с требуемым количеством
+        return unlockedCount >= requiredPrerequisiteCount;
     }
 
     public void UpdateUI(bool canAfford, Skill[] allSkills)
@@ -89,3 +109,5 @@ public class Skill
         isShaking = false;
     }
 }
+
+// в инспекторе можно назанчить сколько "обязательных требований" нужно выполнить для разблокировки навыка
