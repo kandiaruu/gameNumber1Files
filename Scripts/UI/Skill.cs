@@ -11,7 +11,7 @@ public class Skill
     public bool isUnlocked;
     public int[] prerequisiteIndices;
 
-    [SerializeField] private int requiredPrerequisiteCount; // Новое поле: сколько требований нужно выполнить
+    [SerializeField] public int requiredPrerequisiteCount; // Новое поле: сколько требований нужно выполнить
 
     public Button skillButton;
     public GameObject lockIcon;

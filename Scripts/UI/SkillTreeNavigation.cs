@@ -13,11 +13,13 @@ public class SkillTreeNavigation : MonoBehaviour
     private Vector2 originalPivot;
     private bool dragStartedInContainer = false;
 
+    [SerializeField] private SkillTreeManager skillTreeManager; // Ссылка на SkillTreeManager
+
     private void Awake()
     {
-        if (skillHolder == null || skillTreeContainer == null)
+        if (skillHolder == null || skillTreeContainer == null || skillTreeManager == null)
         {
-            Debug.LogError("SkillHolder, SkillTreeContainer или SkillTreePanel не назначены!");
+            Debug.LogError("SkillHolder, SkillTreeContainer или SkillTreeManager не назначены!");
             enabled = false;
             return;
         }
@@ -28,11 +30,11 @@ public class SkillTreeNavigation : MonoBehaviour
 
     private void Update()
     {
-        // Проверяем, находится ли курсор мыши над областью SkillTreeContainer
+        // Проверяем, находится ли курсор мыши над областью SkillTreeContainer и уведомление не активно
         bool isMouseOverContainer = RectTransformUtility.RectangleContainsScreenPoint(skillTreeContainer, Input.mousePosition);
+        bool isNotificationActive = skillTreeManager != null && skillTreeManager.skillNotificationPanel.activeSelf;
 
-        // Обработка масштабирования и начала перетаскивания только внутри контейнера
-        if (isMouseOverContainer)
+        if (!isNotificationActive && isMouseOverContainer)
         {
             float scrollInput = Input.GetAxis("Mouse ScrollWheel");
             if (scrollInput != 0f && !Input.GetMouseButton(2))
@@ -57,8 +59,8 @@ public class SkillTreeNavigation : MonoBehaviour
             Debug.Log("Перетаскивание завершено.");
         }
 
-        // Обработка перетаскивания, если оно началось внутри контейнера
-        if (isDragging && dragStartedInContainer)
+        // Обработка перетаскивания, если оно началось внутри контейнера и уведомление не активно
+        if (!isNotificationActive && isDragging && dragStartedInContainer)
         {
             Vector3 delta = Input.mousePosition - dragOrigin;
             dragOrigin = Input.mousePosition;

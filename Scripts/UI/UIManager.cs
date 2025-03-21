@@ -7,21 +7,33 @@ public class UIManager : MonoBehaviour
     {
         Settings,
         Inventory,
-        SkillTree
+        SkillTree,
+        Notification
     }
 
-    public GameObject settingsPanel;
-    public GameObject inventoryPanel;
-    public GameObject skillTreePanel;
+    [System.Serializable]
+    public class PanelConfig
+    {
+        public PanelType panelType;
+        public GameObject panelObject;
+        public MonoBehaviour[] scriptsToDisable;
+        public List<PanelConfig> childPanels = new List<PanelConfig>(); // Дочерние панели
+    }
 
-    // Ссылки на компоненты, которые нужно включать/выключать
+    [System.Serializable]
+    public class PanelScriptControl
+    {
+        public PanelType panelType;
+        [Tooltip("Скрипты, которые будут отключены при активации этой панели")]
+        public MonoBehaviour[] scriptsToDisable;
+    }
+
+    [SerializeField] private List<PanelConfig> panelConfigs = new List<PanelConfig>();
     [SerializeField] private SkillTreeNavigation skillTreeNavigation;
     [SerializeField] private SkillTreeManager skillTreeManager;
-    [SerializeField] private ThirdPersonCharacter player; // Ссылка на Player.cs
-    [SerializeField] private ThirdPersonCamera cameraController; // Ссылка на Camera.cs (предполагается, что у вас есть такой скрипт)
+    [SerializeField] private List<PanelScriptControl> panelScriptControls = new List<PanelScriptControl>();
 
-    private GameObject currentPanel;
-    private Dictionary<PanelType, GameObject> panelMap;
+    private IPanel currentPanel;
     private Dictionary<KeyCode, PanelType> keyMap;
 
     public static UIManager Instance { get; private set; }
@@ -39,28 +51,10 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        panelMap = new Dictionary<PanelType, GameObject>
-        {
-            { PanelType.Settings, settingsPanel },
-            { PanelType.Inventory, inventoryPanel },
-            { PanelType.SkillTree, skillTreePanel }
-        };
+        InitializePanelSystem();
 
-        foreach (var pair in panelMap)
-        {
-            if (pair.Value == null)
-            {
-                Debug.LogError($"Panel {pair.Key} is not assigned in the Inspector!");
-                Destroy(gameObject);
-                return;
-            }
-        }
-
-        // Проверка компонентов
         if (skillTreeNavigation == null) Debug.LogError("SkillTreeNavigation не назначен в UIManager!");
         if (skillTreeManager == null) Debug.LogError("SkillTreeManager не назначен в UIManager!");
-        if (player == null) Debug.LogError("Player не назначен в UIManager!");
-        if (cameraController == null) Debug.LogError("CameraController не назначен в UIManager!");
 
         keyMap = new Dictionary<KeyCode, PanelType>
         {
@@ -71,19 +65,39 @@ public class UIManager : MonoBehaviour
 
         Cursor.visible = false;
         HideAllPanels();
-        UpdateSkillComponentsState();
-        UpdatePlayerAndCameraState(); // Инициализируем состояние игрока и камеры
     }
 
     void Update()
     {
-        foreach (var key in keyMap.Keys)
+        if (Input.GetKeyDown(KeyCode.Escape))
         {
-            if (Input.GetKeyDown(key))
+            if (currentPanel != null)
             {
-                TogglePanel(keyMap[key]);
-                break;
+                var currentConfig = FindPanelConfig(panelConfigs, currentPanel.PanelObject);
+                if (currentConfig != null)
+                {
+                    var activeChild = FindActiveChild(currentConfig);
+                    if (activeChild != null)
+                    {
+                        activeChild.Close();
+                        return;
+                    }
+                }
+
+                CloseCurrentPanel();
             }
+            else
+            {
+                TogglePanel(PanelType.Settings);
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            TogglePanel(PanelType.Inventory);
+        }
+        else if (Input.GetKeyDown(KeyCode.U))
+        {
+            TogglePanel(PanelType.SkillTree);
         }
     }
 
@@ -91,12 +105,13 @@ public class UIManager : MonoBehaviour
     {
         if (currentPanel != null)
         {
-            if (currentPanel == panelMap[panelType] || panelType == PanelType.Settings)
+            var currentConfig = FindPanelConfig(panelConfigs, currentPanel.PanelObject);
+            if (currentConfig != null && (currentConfig.panelType == panelType || panelType == PanelType.Settings))
             {
                 CloseCurrentPanel();
                 return;
             }
-            return; // Если другая панель уже открыта, ничего не делаем
+            return;
         }
 
         OpenPanel(panelType);
@@ -105,34 +120,65 @@ public class UIManager : MonoBehaviour
     private void OpenPanel(PanelType panelType)
     {
         HideAllPanels();
-        currentPanel = panelMap[panelType];
-        currentPanel.SetActive(true);
-        SetGamePaused(panelType != PanelType.Inventory);
-        UpdateSkillComponentsState();
-        UpdatePlayerAndCameraState(); // Обновляем состояние игрока и камеры
+        var config = FindPanelConfigByType(panelConfigs, panelType);
+        if (config != null && config.panelObject != null)
+        {
+            currentPanel = config.panelObject.GetComponent<IPanel>();
+            if (currentPanel != null)
+            {
+                currentPanel.Open();
+                SetGamePaused(panelType != PanelType.Inventory);
+                UpdateSkillComponentsState();
+                UpdateScriptStates(panelType);
+            }
+            else
+            {
+                Debug.LogError($"Панель {panelType} не имеет компонента IPanel!");
+            }
+        }
+        else
+        {
+            Debug.LogError($"Конфигурация для панели {panelType} не найдена!");
+        }
     }
 
     private void CloseCurrentPanel()
     {
         if (currentPanel != null)
         {
-            currentPanel.SetActive(false);
+            currentPanel.Close();
             currentPanel = null;
             SetGamePaused(false);
             UpdateSkillComponentsState();
-            UpdatePlayerAndCameraState(); // Обновляем состояние игрока и камеры
+            UpdateScriptStates(null);
         }
     }
 
     private void HideAllPanels()
     {
-        foreach (var panel in panelMap.Values)
+        foreach (var config in panelConfigs)
         {
-            panel.SetActive(false);
+            HidePanelRecursive(config);
         }
         currentPanel = null;
         UpdateSkillComponentsState();
-        UpdatePlayerAndCameraState(); // Обновляем состояние игрока и камеры
+        UpdateScriptStates(null);
+    }
+
+    private void HidePanelRecursive(PanelConfig config)
+    {
+        if (config.panelObject != null)
+        {
+            var panel = config.panelObject.GetComponent<IPanel>();
+            if (panel != null)
+            {
+                panel.Close();
+            }
+        }
+        foreach (var child in config.childPanels)
+        {
+            HidePanelRecursive(child);
+        }
     }
 
     private void SetGamePaused(bool paused)
@@ -147,10 +193,10 @@ public class UIManager : MonoBehaviour
         OpenPanel(panelType);
     }
 
-    // Метод для управления состоянием компонентов дерева навыков
     private void UpdateSkillComponentsState()
     {
-        bool isSkillTreeActive = skillTreePanel.activeInHierarchy;
+        var skillTreeConfig = FindPanelConfigByType(panelConfigs, PanelType.SkillTree);
+        bool isSkillTreeActive = skillTreeConfig != null && skillTreeConfig.panelObject != null && skillTreeConfig.panelObject.activeInHierarchy;
 
         if (skillTreeNavigation != null)
         {
@@ -163,19 +209,119 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // Метод для управления состоянием игрока и камеры
-    private void UpdatePlayerAndCameraState()
+    private void UpdateScriptStates(PanelType? activePanelType)
     {
-        bool isSettingsOrSkillTreeActive = settingsPanel.activeInHierarchy || skillTreePanel.activeInHierarchy;
-
-        if (player != null)
+        foreach (var control in panelScriptControls)
         {
-            player.enabled = !isSettingsOrSkillTreeActive; // Отключаем Player.cs, если открыты Settings или SkillTree
+            foreach (var script in control.scriptsToDisable)
+            {
+                if (script != null)
+                {
+                    script.enabled = true;
+                }
+            }
         }
 
-        if (cameraController != null)
+        if (activePanelType.HasValue)
         {
-            cameraController.enabled = !isSettingsOrSkillTreeActive; // Отключаем Camera.cs, если открыты Settings или SkillTree
+            var control = panelScriptControls.Find(c => c.panelType == activePanelType.Value);
+            if (control != null)
+            {
+                foreach (var script in control.scriptsToDisable)
+                {
+                    if (script != null)
+                    {
+                        script.enabled = false;
+                    }
+                }
+            }
         }
+    }
+
+    private void InitializePanelSystem()
+    {
+        foreach (var config in panelConfigs)
+        {
+            InitializePanelRecursive(config);
+        }
+    }
+
+    private void InitializePanelRecursive(PanelConfig config)
+    {
+        if (config.panelObject == null)
+        {
+            Debug.LogError($"Панель {config.panelType} не назначена в инспекторе!");
+            return;
+        }
+        if (!config.panelObject.GetComponent<BasePanel>())
+        {
+            config.panelObject.AddComponent<BasePanel>();
+        }
+
+        var panel = config.panelObject.GetComponent<IPanel>();
+        foreach (var childConfig in config.childPanels)
+        {
+            InitializePanelRecursive(childConfig);
+            if (childConfig.panelObject != null)
+            {
+                var childPanel = childConfig.panelObject.GetComponent<IPanel>();
+                if (childPanel != null)
+                {
+                    panel.AddChild(childPanel);
+                }
+            }
+        }
+    }
+
+    private PanelConfig FindPanelConfig(List<PanelConfig> configs, GameObject panelObject)
+    {
+        foreach (var config in configs)
+        {
+            if (config.panelObject == panelObject)
+            {
+                return config;
+            }
+            var found = FindPanelConfig(config.childPanels, panelObject);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private PanelConfig FindPanelConfigByType(List<PanelConfig> configs, PanelType panelType)
+    {
+        foreach (var config in configs)
+        {
+            if (config.panelType == panelType)
+            {
+                return config;
+            }
+            var found = FindPanelConfigByType(config.childPanels, panelType);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private IPanel FindActiveChild(PanelConfig config)
+    {
+        foreach (var childConfig in config.childPanels)
+        {
+            var childPanel = childConfig.panelObject.GetComponent<IPanel>();
+            if (childPanel != null && childPanel.IsOpen)
+            {
+                return childPanel;
+            }
+            var deeperChild = FindActiveChild(childConfig);
+            if (deeperChild != null)
+            {
+                return deeperChild;
+            }
+        }
+        return null;
     }
 }
