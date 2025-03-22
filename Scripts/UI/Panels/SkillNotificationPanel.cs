@@ -14,7 +14,7 @@ public class SkillNotificationPanel : BasePanel
     private RectTransform notificationRect;
     private List<Button> dynamicButtons = new List<Button>();
     private Skill currentSkill;
-    [SerializeField] private SkillTreeManager skillTreeManager;
+    private ISkillTreeManager currentManager;
 
     protected override void Awake()
     {
@@ -42,43 +42,32 @@ public class SkillNotificationPanel : BasePanel
     {
         base.Open();
         notificationRect.anchoredPosition = fixedPosition;
-        Debug.Log("Уведомление открыто.");
+        Debug.Log("Уведомление открыто, activeSelf: " + gameObject.activeSelf);
     }
 
     protected override void OnClose()
     {
         ClearButtons();
-        if (skillTreeManager != null)
+        if (currentManager != null)
         {
-            if (skillTreeManager.originalColorBlocks != null)
-            {
-                skillTreeManager.EnableSkillButtons(true);
-                Debug.Log("Кнопки навыков включены.");
-            }
-            else
-            {
-                Debug.LogWarning("originalColorBlocks не установлен в SkillTreeManager!");
-            }
-        }
-        else
-        {
-            Debug.LogWarning("SkillTreeManager не установлен в SkillNotificationPanel!");
+            currentManager.EnableSkillButtons(true);
+            currentManager.OnNotificationPanelClosed();
         }
         currentSkill = null;
+        currentManager = null;
     }
 
-    public void ShowNotification(Skill skill, SkillTreeManager skillTreeManager)
+    public void ShowNotification(Skill skill, ISkillTreeManager skillTreeManager)
     {
-        this.skillTreeManager = skillTreeManager;
+        Debug.Log("ShowNotification в SkillNotificationPanel вызван для " + skill.skillName);
         currentSkill = skill;
+        currentManager = skillTreeManager;
         Open();
-        Debug.Log("Уведомление открыто.1");
-
         ClearButtons();
 
         if (!skill.hasQuestionState)
         {
-            Debug.Log($"Условие: !skill.hasQuestionState. hasQuestionState = {skill.hasQuestionState}");
+            Debug.Log("Условие: !skill.hasQuestionState");
             notificationText.text = $"Навык \"{skill.skillName}\" скрыт.\n" +
                                    $"Стоимость раскрытия: {skill.questionGoldCost} золота.";
             AddButton("Купить", () =>
@@ -90,14 +79,14 @@ public class SkillNotificationPanel : BasePanel
         }
         else if (!skill.CanUnlock(skillTreeManager.GetAllSkills()))
         {
-            Debug.Log($"Условие: !skill.CanUnlock. CanUnlock = {skill.CanUnlock(skillTreeManager.GetAllSkills())}");
+            Debug.Log("Условие: !skill.CanUnlock");
             notificationText.text = $"Навык \"{skill.skillName}\" заблокирован.\n" +
                                    $"Не выполнены обязательные требования.";
             AddButton("Закрыть", Close);
         }
         else if (skillTreeManager.GetSkillPoints() < skill.cost)
         {
-            Debug.Log($"Условие: skillTreeManager.GetSkillPoints() < skill.cost. SkillPoints = {skillTreeManager.GetSkillPoints()}, Cost = {skill.cost}");
+            Debug.Log("Условие: skillTreeManager.GetSkillPoints() < skill.cost");
             notificationText.text = $"Недостаточно очков навыков для разблокировки \"{skill.skillName}\".\n" +
                                    $"Требуется: {skill.cost} очков.";
             AddButton("Закрыть", Close);
@@ -114,39 +103,36 @@ public class SkillNotificationPanel : BasePanel
             });
             AddButton("Отмена", Close);
         }
+
+        skillTreeManager.EnableSkillButtons(false);
     }
 
     private void AddButton(string buttonText, Action onClick)
     {
-        if (buttonPrefab == null)
+        if (buttonPrefab == null || buttonContainer == null)
         {
-            Debug.LogError("buttonPrefab не назначен! Кнопки не могут быть созданы.");
-            return;
-        }
-        if (buttonContainer == null)
-        {
-            Debug.LogError("buttonContainer не назначен! Кнопки не могут быть созданы.");
+            Debug.LogError("buttonPrefab или buttonContainer не назначены, кнопки не создаются!");
             return;
         }
 
         Button newButton = Instantiate(buttonPrefab, buttonContainer);
         var textComponent = newButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (textComponent == null)
-        {
-            Debug.LogError($"TextMeshProUGUI не найден на кнопке {newButton.name}!");
-        }
-        else
+        if (textComponent != null)
         {
             textComponent.text = buttonText;
         }
+        else
+        {
+            Debug.LogError("TextMeshProUGUI не найден на кнопке!");
+        }
         newButton.onClick.AddListener(() => onClick?.Invoke());
         dynamicButtons.Add(newButton);
-        Debug.Log($"Кнопка '{buttonText}' создана и добавлена в {buttonContainer.name}");
+        Debug.Log("Кнопка добавлена: " + buttonText);
     }
 
     private void ClearButtons()
     {
-        Debug.Log("Очистка кнопок в SkillNotificationPanel");
+        Debug.Log("Очистка кнопок");
         foreach (var button in dynamicButtons)
         {
             if (button != null)

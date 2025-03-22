@@ -4,32 +4,25 @@ using TMPro;
 using System.Linq;
 using UnityEngine.EventSystems;
 
-public class SkillTreeManager : MonoBehaviour
+public class SkillTreeManager : MonoBehaviour, ISkillTreeManager
 {
     public static SkillTreeManager Instance { get; private set; }
 
     [SerializeField] private Skill[] skills;
     [SerializeField] private TextMeshProUGUI skillPointsText;
-    [SerializeField] private Button resetButton;
+    [SerializeField] private Button skillsResetButton;
     [SerializeField] private int skillPoints = 3;
-    [SerializeField] private GameObject tooltipPanel; // SkillInfo (tooltip при наведении)
-    [SerializeField] private TextMeshProUGUI tooltipText;
-    [SerializeField] private SkillTreeNavigation skillTreeNavigation; // Ссылка на SkillTreeNavigation
+    [SerializeField] private SkillTreeNavigation skillTreeNavigation;
 
     [SerializeField] private int gold = 10;
     [SerializeField] private TextMeshProUGUI goldText;
     [SerializeField] private Button resetQuestionsButton;
 
-    [SerializeField] public GameObject skillNotificationPanel; // Новая панель уведомления
-    [SerializeField] private Vector2 notificationPosition = new Vector2(960f, -540f); // Фиксированная позиция (центр экрана для 1920x1080)
+    public bool skillNotificationPanelActive = false; // Флаг активности панели уведомлений
 
-    private bool isTooltipActive = false;
-    private RectTransform tooltipRect;
-    [SerializeField] private float TOOLTIP_OFFSET_X = 500f;
-    private Skill lastHoveredSkill; // Сохраняем последний навык, над которым был курсор
-    private bool wasDraggingLastFrame = false; // Отслеживаем состояние перетаскивания
+    private Skill lastHoveredSkill; // Последний навык, над которым был курсор
+    private bool wasDraggingLastFrame = false; // Отслеживание состояния перетаскивания
 
-    // Сохраняем оригинальные ColorBlock для каждой кнопки
     public ColorBlock[] originalColorBlocks;
 
     private void Awake()
@@ -50,8 +43,8 @@ public class SkillTreeManager : MonoBehaviour
 
     private void Start()
     {
-        if (resetButton == null) Debug.LogError("Кнопка сброса не назначена!");
-        resetButton.onClick.AddListener(ResetSkills);
+        if (skillsResetButton == null) Debug.LogError("Кнопка сброса не назначена!");
+        skillsResetButton.onClick.AddListener(ResetSkills);
         if (skillPointsText == null) Debug.LogError("Текст очков навыков не назначен!");
         UpdateSkillPointsUI();
         UpdateGoldUI();
@@ -60,30 +53,6 @@ public class SkillTreeManager : MonoBehaviour
         if (resetQuestionsButton == null) Debug.LogError("Кнопка сброса вопросов не назначена!");
         resetQuestionsButton.onClick.AddListener(ResetQuestionsAndGold);
 
-        if (tooltipPanel != null)
-        {
-            tooltipRect = tooltipPanel.GetComponent<RectTransform>();
-            if (tooltipRect == null)
-            {
-                Debug.LogError("RectTransform для tooltipPanel не найден!");
-            }
-            else
-            {
-                Debug.Log("tooltipRect успешно инициализирован");
-                tooltipPanel.SetActive(false);
-            }
-        }
-        else
-        {
-            Debug.LogError("tooltipPanel не назначен в инспекторе!");
-        }
-
-        if (skillTreeNavigation == null)
-        {
-            Debug.LogError("SkillTreeNavigation не назначен в инспекторе!");
-        }
-
-        // Сохраняем оригинальные ColorBlock для всех кнопок
         originalColorBlocks = new ColorBlock[skills.Length];
         for (int i = 0; i < skills.Length; i++)
         {
@@ -113,15 +82,10 @@ public class SkillTreeManager : MonoBehaviour
                 skill.skillButton.onClick.RemoveAllListeners();
                 skill.skillButton.onClick.AddListener(() =>
                 {
-                    if (!skill.isUnlocked) // Показываем уведомление только если навык НЕ разблокирован
+                    if (!skill.isUnlocked)
                     {
-                        ShowNotification(skill); // Новая функция для показа уведомления
+                        ShowNotification(skill);
                     }
-
-                    /*if (!skill.isUnlocked && skill.questionIcon.activeSelf)
-                        Instance.BuyQuestionState(skill.skillIndex); // Покупка ? если он активен
-                    else if (!skill.isUnlocked)
-                        UnlockSkill(skill.skillIndex); // Стандартная разблокировка*/
                 });
             }
         }
@@ -129,15 +93,12 @@ public class SkillTreeManager : MonoBehaviour
 
     private void Update()
     {
-        if (skillTreeNavigation != null)
+        if (skillTreeNavigation != null && !skillNotificationPanelActive && TooltipManager.Instance != null)
         {
-            // Если идет перетаскивание и tooltip активен, скрываем его
-            if (skillTreeNavigation.isDragging && isTooltipActive)
+            if (skillTreeNavigation.isDragging)
             {
-                isTooltipActive = false;
-                tooltipPanel.SetActive(false);
+                TooltipManager.Instance.HideTooltip();
             }
-            // Проверяем, закончилось ли перетаскивание в этом кадре
             else if (wasDraggingLastFrame && !skillTreeNavigation.isDragging)
             {
                 foreach (var skill in skills)
@@ -153,21 +114,9 @@ public class SkillTreeManager : MonoBehaviour
                     }
                 }
             }
-            // Обновляем позицию tooltip только если он активен и нет перетаскивания
-            else if (isTooltipActive && tooltipPanel != null && tooltipRect != null && !skillTreeNavigation.isDragging)
+            else if (!skillTreeNavigation.isDragging)
             {
-                Vector3 mousePosition = Input.mousePosition;
-                Vector3 targetPosition = new Vector3(mousePosition.x + TOOLTIP_OFFSET_X, mousePosition.y, 0f);
-
-                Vector2 tooltipSize = tooltipRect.sizeDelta;
-
-                if (targetPosition.x + tooltipSize.x > Screen.width)
-                {
-                    targetPosition.x = Screen.width - tooltipSize.x;
-                }
-                targetPosition.y = Mathf.Clamp(targetPosition.y, tooltipSize.y, Screen.height);
-
-                tooltipRect.position = Vector3.Lerp(tooltipRect.position, targetPosition, Time.unscaledDeltaTime * 15f);
+                TooltipManager.Instance.UpdateTooltipPosition(Input.mousePosition);
             }
 
             wasDraggingLastFrame = skillTreeNavigation.isDragging;
@@ -176,34 +125,12 @@ public class SkillTreeManager : MonoBehaviour
 
     public void OnPointerEnter(Skill skill)
     {
-        Debug.Log("OnPointerEnter вызван для " + skill.skillName);
-        // Проверяем, что уведомление не активно, чтобы отключить tooltip
-        if (tooltipPanel != null && tooltipText != null && !isTooltipActive && !skill.questionIcon.activeSelf &&
-            (skillTreeNavigation == null || !skillTreeNavigation.isDragging) && !skillNotificationPanel.activeSelf)
+        Debug.Log($"OnPointerEnter вызван для {skill.skillName}");
+        if (!skill.questionIcon.activeSelf &&
+            (skillTreeNavigation == null || !skillTreeNavigation.isDragging) &&
+            !skillNotificationPanelActive)
         {
-            isTooltipActive = true;
-            tooltipPanel.SetActive(true);
-            Debug.Log("Tooltip активирован");
-            Canvas.ForceUpdateCanvases();
-
-            string tooltipContent = $"Навык: {skill.skillName}\n" +
-                                   $"Описание: {skill.description}\n" +
-                                   $"Характеристики: {string.Join(", ", skill.characteristics ?? new string[] { "Нет данных" })}\n" +
-                                   $"Макс. улучшений: {skill.maxUpgrades}";
-            tooltipText.text = tooltipContent;
-
-            Vector3 mousePosition = Input.mousePosition;
-            Vector3 initialPosition = new Vector3(mousePosition.x + TOOLTIP_OFFSET_X, mousePosition.y, 0f);
-
-            Vector2 tooltipSize = tooltipRect.sizeDelta;
-            if (initialPosition.x + tooltipSize.x > Screen.width)
-            {
-                initialPosition.x = Screen.width - tooltipSize.x;
-            }
-            initialPosition.y = Mathf.Clamp(initialPosition.y, tooltipSize.y, Screen.height);
-
-            tooltipRect.position = initialPosition;
-
+            TooltipManager.Instance.ShowTooltip(skill, Input.mousePosition);
             lastHoveredSkill = skill;
         }
     }
@@ -211,11 +138,7 @@ public class SkillTreeManager : MonoBehaviour
     public void OnPointerExit()
     {
         Debug.Log("OnPointerExit вызван");
-        if (tooltipPanel != null && isTooltipActive)
-        {
-            isTooltipActive = false;
-            tooltipPanel.SetActive(false);
-        }
+        TooltipManager.Instance.HideTooltip();
     }
 
     private void InitializeSkills()
@@ -264,15 +187,10 @@ public class SkillTreeManager : MonoBehaviour
                 skill.skillButton.onClick.RemoveAllListeners();
                 skill.skillButton.onClick.AddListener(() =>
                 {
-                    if (!skill.isUnlocked) // Показываем уведомление только если навык НЕ разблокирован
+                    if (!skill.isUnlocked)
                     {
-                        ShowNotification(skill); // Новая функция для показа уведомления
+                        ShowNotification(skill);
                     }
-
-                    /*if (!skill.isUnlocked && skill.questionIcon.activeSelf)
-                        Instance.BuyQuestionState(skill.skillIndex); // Покупка ? если он активен
-                    else if (!skill.isUnlocked)
-                        UnlockSkill(skill.skillIndex); // Стандартная разблокировка*/
                 });
             }
         }
@@ -345,7 +263,7 @@ public class SkillTreeManager : MonoBehaviour
             UpdateGoldUI();
             RefreshAllSkills();
 
-            OnPointerEnter(skill); // Показываем tooltip после покупки ?
+            OnPointerEnter(skill);
         }
     }
 
@@ -383,27 +301,23 @@ public class SkillTreeManager : MonoBehaviour
 
     private void ShowNotification(Skill skill)
     {
-        Debug.Log("ShowNotification вызван для " + skill.skillName);
-        if (skillNotificationPanel != null)
+        if (NotificationManager.Instance != null)
         {
-            var panel = skillNotificationPanel.GetComponent<SkillNotificationPanel>();
-            if (panel != null)
-            {
-                panel.ShowNotification(skill, this); // Вызываем метод ShowNotification из SkillNotificationPanel
-                EnableSkillButtons(false);
-            }
-            else
-            {
-                Debug.LogError("SkillNotificationPanel не найден на объекте skillNotificationPanel!");
-            }
+            NotificationManager.Instance.ShowNotification(skill, this);
+            skillNotificationPanelActive = true;
         }
         else
         {
-            Debug.LogError("skillNotificationPanel не назначен!");
+            Debug.LogError("NotificationManager не инициализирован!");
         }
     }
 
-    // Метод для включения/выключения всех кнопок навыков с сохранением цвета
+    public void OnNotificationPanelClosed()
+    {
+        skillNotificationPanelActive = false;
+        Debug.Log("SkillNotificationPanel закрыта, skillNotificationPanelActive = false");
+    }
+
     public void EnableSkillButtons(bool enable)
     {
         for (int i = 0; i < skills.Length; i++)
@@ -413,7 +327,6 @@ public class SkillTreeManager : MonoBehaviour
                 Button button = skills[i].skillButton;
                 if (enable)
                 {
-                    // Восстанавливаем оригинальный ColorBlock при активации
                     if (i < originalColorBlocks.Length && originalColorBlocks[i] != null)
                     {
                         button.colors = originalColorBlocks[i];
@@ -422,14 +335,12 @@ public class SkillTreeManager : MonoBehaviour
                 }
                 else
                 {
-                    // Сохраняем текущий ColorBlock перед отключением, если еще не сохранен
                     if (i >= originalColorBlocks.Length || originalColorBlocks[i] == null)
                     {
                         originalColorBlocks[i] = button.colors;
                     }
-                    // Устанавливаем временный ColorBlock с одинаковым цветом для всех состояний
                     ColorBlock tempColorBlock = button.colors;
-                    tempColorBlock.disabledColor = tempColorBlock.normalColor; // Цвет при отключении = обычный цвет
+                    tempColorBlock.disabledColor = tempColorBlock.normalColor;
                     tempColorBlock.colorMultiplier = 1f;
                     button.colors = tempColorBlock;
                     button.interactable = false;
@@ -438,15 +349,11 @@ public class SkillTreeManager : MonoBehaviour
         }
     }
 
-    // Публичный метод для проверки и закрытия уведомления
-
-    
     public Skill[] GetAllSkills()
     {
         return skills;
     }
 
-    // Добавляем метод для доступа к очкам навыков
     public int GetSkillPoints()
     {
         return skillPoints;

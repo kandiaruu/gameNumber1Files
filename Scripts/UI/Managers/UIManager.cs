@@ -8,7 +8,8 @@ public class UIManager : MonoBehaviour
         Settings,
         Inventory,
         SkillTree,
-        Notification
+        Notification,
+        Tooltip
     }
 
     [System.Serializable]
@@ -32,6 +33,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private SkillTreeNavigation skillTreeNavigation;
     [SerializeField] private SkillTreeManager skillTreeManager;
     [SerializeField] private List<PanelScriptControl> panelScriptControls = new List<PanelScriptControl>();
+    private Dictionary<PanelType, GameObject> panelCache = new Dictionary<PanelType, GameObject>(); // Кэш панелей
 
     private IPanel currentPanel;
     private Dictionary<KeyCode, PanelType> keyMap;
@@ -64,7 +66,54 @@ public class UIManager : MonoBehaviour
         };
 
         Cursor.visible = false;
+        CachePanels(); // Кэшируем панели при старте
         HideAllPanels();
+    }
+    private void CachePanels()
+    {
+        panelCache.Clear(); // Очищаем кэш на случай повторного вызова
+        CachePanelsRecursive(panelConfigs);
+    }
+
+    private void CachePanelsRecursive(List<PanelConfig> configs)
+    {
+        foreach (var config in configs)
+        {
+            if (config.panelObject != null)
+            {
+                if (panelCache.ContainsKey(config.panelType))
+                {
+                    Debug.LogWarning($"Обнаружен дубликат типа панели {config.panelType}. Используется первый найденный объект.");
+                }
+                else
+                {
+                    panelCache[config.panelType] = config.panelObject;
+                    Debug.Log($"Кэширована панель: {config.panelType} -> {config.panelObject.name}");
+                }
+            }
+            else
+            {
+                Debug.LogError($"PanelObject для типа {config.panelType} не назначен!");
+            }
+            CachePanelsRecursive(config.childPanels); // Рекурсивно кэшируем дочерние панели
+        }
+    }
+
+    // Метод для получения панели из кэша
+    public GameObject GetPanel(PanelType panelType)
+    {
+        if (panelCache.TryGetValue(panelType, out GameObject panel))
+        {
+            return panel;
+        }
+        Debug.LogError($"Панель типа {panelType} не найдена в кэше!");
+        return null;
+    }
+
+    // Метод для доступа к panelConfigs (если нужно снаружи)
+    public List<PanelConfig> GetPanelConfigs()
+    {
+        return panelConfigs;
     }
 
     void Update()

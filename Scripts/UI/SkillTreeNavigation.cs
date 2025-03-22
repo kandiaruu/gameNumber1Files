@@ -32,7 +32,7 @@ public class SkillTreeNavigation : MonoBehaviour
     {
         // Проверяем, находится ли курсор мыши над областью SkillTreeContainer и уведомление не активно
         bool isMouseOverContainer = RectTransformUtility.RectangleContainsScreenPoint(skillTreeContainer, Input.mousePosition);
-        bool isNotificationActive = skillTreeManager != null && skillTreeManager.skillNotificationPanel.activeSelf;
+        bool isNotificationActive = skillTreeManager != null && skillTreeManager.skillNotificationPanelActive;
 
         if (!isNotificationActive && isMouseOverContainer)
         {

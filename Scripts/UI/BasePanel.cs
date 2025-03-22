@@ -9,17 +9,13 @@ public class BasePanel : MonoBehaviour, IPanel
 
     public virtual void Open()
     {
+        //Debug.Log($"BasePanel.Open() вызван для {gameObject.name}, gameObject.activeSelf={gameObject.activeSelf}");
         gameObject.SetActive(true);
-        // Убираем автоматическое открытие дочерних панелей
-        // foreach (var child in Children)
-        // {
-        //     if (!child.IsOpen) child.Open();
-        // }
+        //Debug.Log($"После BasePanel.Open(), gameObject.activeSelf={gameObject.activeSelf}, activeInHierarchy={gameObject.activeInHierarchy}");
     }
 
     public virtual void Close()
     {
-        Debug.Log("Закрытие панели123.");
         OnClose();
         gameObject.SetActive(false);
         foreach (var child in Children)
