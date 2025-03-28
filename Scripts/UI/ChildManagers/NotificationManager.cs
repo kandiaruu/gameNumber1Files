@@ -1,20 +1,17 @@
 using UnityEngine;
 
-public class NotificationManager : MonoBehaviour
+public class NotificationManager : MonoBehaviour, INotificationManager
 {
-    private SkillTreeManager skillTreeManager;
-    private SkillNotificationPanel notificationPanel;
-    private UIManager uiManager;
+    [InjectAttribute1]
+    private ISkillTreeManager skillLogicManager { get; set; }
+    [InjectAttribute1]
+    private ISkillNotificationPanel notificationPanel { get; set; }
+    [InjectAttribute1]
+    private IUIManager uiManager { get; set; }
 
     void Awake()
     {
-        DependencyContainer container = DependencyContainer.Instance;
-        skillTreeManager = container.Resolve<SkillTreeManager>();
-        uiManager = container.Resolve<UIManager>();
-
-        if (skillTreeManager == null) Debug.LogError("SkillTreeManager не зарегистрирован!");
-        if (uiManager == null) Debug.LogError("UIManager не зарегистрирован!");
-
+        DependencyContainer1.InjectDependencies(this);
         InitializeNotificationPanel();
     }
 
@@ -39,7 +36,7 @@ public class NotificationManager : MonoBehaviour
     {
         if (notificationPanel != null)
         {
-            notificationPanel.ShowNotification(skill, skillTreeManager);
+            notificationPanel.ShowNotification(skill, skillLogicManager);
         }
         else
         {

@@ -4,7 +4,7 @@ using TMPro;
 using System;
 using System.Collections.Generic;
 
-public class SkillNotificationPanel : BasePanel
+public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
 {
     [SerializeField] private TextMeshProUGUI notificationText;
     [SerializeField] private Transform buttonContainer;
@@ -14,27 +14,28 @@ public class SkillNotificationPanel : BasePanel
     private RectTransform notificationRect;
     private List<Button> dynamicButtons = new List<Button>();
     private Skill currentSkill;
-    private ISkillTreeManager currentManager;
+    [InjectAttribute1]
+    private ISkillTreeManager skillLogicManager { get; set; }
+    [InjectAttribute1]
+    private ISkillUIManager skillUIManager { get; set; }
 
-    // Изменение: добавляем override для переопределения Awake из BasePanel
     public override void Awake()
     {
-        base.Awake(); // Вызываем базовую реализацию
+        DependencyContainer1.InjectDependencies(this);
+        //DependencyContainer.Instance.RegisterManual(this);
+        base.Awake();
         notificationRect = GetComponent<RectTransform>();
         if (notificationRect == null) Debug.LogError("RectTransform для SkillNotificationPanel не найден!");
         if (notificationText == null) Debug.LogError("notificationText не назначен!");
         if (buttonContainer == null) Debug.LogError("buttonContainer не назначен!");
         if (buttonPrefab == null) Debug.LogError("buttonPrefab не назначен!");
-
-        currentManager = DependencyContainer.Instance.Resolve<ISkillTreeManager>();
-        if (currentManager == null) Debug.LogError("ISkillTreeManager не зарегистрирован!");
     }
 
     public void ShowNotification(Skill skill, ISkillTreeManager skillTreeManager = null)
     {
         Debug.Log("ShowNotification вызван для " + skill.skillName);
         currentSkill = skill;
-        currentManager = skillTreeManager ?? currentManager;
+        skillLogicManager = skillTreeManager ?? skillLogicManager;
         Open();
         ClearButtons();
 
@@ -42,16 +43,16 @@ public class SkillNotificationPanel : BasePanel
         {
             notificationText.text = $"Навык \"{skill.skillName}\" скрыт.\n" +
                                    $"Стоимость раскрытия: {skill.questionGoldCost} золота.";
-            AddButton("Купить", () => { currentManager.BuyQuestionState(skill.skillIndex); Close(); });
+            AddButton("Купить", () => { skillLogicManager.BuyQuestionState(skill.skillIndex); Close(); });
             AddButton("Отмена", Close);
         }
-        else if (!skill.CanUnlock(currentManager.GetAllSkills()))
+        else if (!skill.CanUnlock(skillLogicManager.GetAllSkills()))
         {
             notificationText.text = $"Навык \"{skill.skillName}\" заблокирован.\n" +
                                    $"Не выполнены обязательные требования.";
             AddButton("Закрыть", Close);
         }
-        else if (currentManager.GetSkillPoints() < skill.cost)
+        else if (skillLogicManager.GetSkillPoints() < skill.cost)
         {
             notificationText.text = $"Недостаточно очков навыков для разблокировки \"{skill.skillName}\".\n" +
                                    $"Требуется: {skill.cost} очков.";
@@ -61,23 +62,22 @@ public class SkillNotificationPanel : BasePanel
         {
             notificationText.text = $"Разблокировать навык \"{skill.skillName}\"?\n" +
                                    $"Стоимость: {skill.cost} очков навыков.";
-            AddButton("Разблокировать", () => { currentManager.UnlockSkill(skill.skillIndex); Close(); });
+            AddButton("Разблокировать", () => { skillLogicManager.UnlockSkill(skill.skillIndex); Close(); });
             AddButton("Отмена", Close);
         }
 
-        currentManager.EnableSkillButtons(false);
+        skillUIManager.EnableSkillButtons(false);
     }
 
     protected override void OnClose()
     {
         ClearButtons();
-        if (currentManager != null)
+        if (skillUIManager != null)
         {
-            currentManager.EnableSkillButtons(true);
-            currentManager.OnNotificationPanelClosed();
+            skillUIManager.EnableSkillButtons(true);
         }
         currentSkill = null;
-        currentManager = null;
+        skillLogicManager = null;
     }
 
     private void AddButton(string buttonText, Action onClick)

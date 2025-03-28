@@ -1,7 +1,7 @@
 using UnityEngine;
 using TMPro;
 
-public class SkillTooltipPanel : BasePanel
+public class SkillTooltipPanel : BasePanel, ISkillTooltipPanel
 {
     [SerializeField] private TextMeshProUGUI tooltipText;
     [SerializeField] private float offsetX = 375f;
@@ -9,7 +9,7 @@ public class SkillTooltipPanel : BasePanel
 
     public override void Awake()
     {
-        base.Awake(); // Вызываем Awake из BasePanel для проверки IPanel
+        base.Awake();
         tooltipRect = GetComponent<RectTransform>();
         if (tooltipText == null) Debug.LogError("tooltipText не назначен!");
         if (tooltipRect == null) Debug.LogError("tooltipRect не найден!");
@@ -17,8 +17,7 @@ public class SkillTooltipPanel : BasePanel
 
     public void ShowTooltip(Skill skill, Vector3 mousePosition)
     {
-        Open(); // Используем Open из BasePanel для активации объекта
-
+        Open();
         string content = $"Навык: {skill.skillName}\n" +
                          $"Описание: {skill.description}\n" +
                          $"Характеристики: {string.Join(", ", skill.characteristics ?? new string[] { "Нет данных" })}\n" +
@@ -37,7 +36,6 @@ public class SkillTooltipPanel : BasePanel
 
     public void UpdatePosition(Vector3 mousePosition)
     {
-        Debug.Log("Обновление позиции тултипа...");
         Vector3 targetPosition = new Vector3(mousePosition.x + offsetX, mousePosition.y, 0f);
         Vector2 tooltipSize = tooltipRect.sizeDelta;
         if (targetPosition.x + tooltipSize.x > Screen.width)

@@ -1,24 +1,18 @@
 using UnityEngine;
 
-public class TooltipManager : MonoBehaviour
+public class TooltipManager : MonoBehaviour, ITooltipManager
 {
-    // Удаляем Singleton
-    // public static TooltipManager Instance { get; private set; }
-
     private GameObject tooltipPanelObject;
-    private SkillTooltipPanel tooltip;
-    private int initAttempts = 0;
-    private const int MAX_INIT_ATTEMPTS = 5;
-    private UIManager uiManager; // Зависимость через DI
+    [InjectAttribute1]
+    private ISkillTooltipPanel tooltip { get; set; }
+    [InjectAttribute1]
+    private IUIManager uiManager { get; set; }
 
     void Awake()
     {
-        // Удаляем логику Singleton
-        // Получаем UIManager через DependencyContainer
-        uiManager = DependencyContainer.Instance.Resolve<UIManager>();
-        if (uiManager == null) Debug.LogError("UIManager не зарегистрирован в DependencyContainer!");
+        DependencyContainer1.InjectDependencies(this);
 
-        // Изменение: используем UnityEngine.Object для DontDestroyOnLoad
+        transform.SetParent(null);
         UnityEngine.Object.DontDestroyOnLoad(gameObject);
 
         InitializeTooltip();
@@ -26,19 +20,6 @@ public class TooltipManager : MonoBehaviour
 
     private void InitializeTooltip()
     {
-        if (uiManager == null)
-        {
-            if (initAttempts >= MAX_INIT_ATTEMPTS)
-            {
-                Debug.LogError("Не удалось инициализировать TooltipManager: UIManager так и не был найден после максимального числа попыток!");
-                return;
-            }
-            initAttempts++;
-            Debug.LogWarning($"UIManager не доступен, откладываем инициализацию (попытка {initAttempts}/{MAX_INIT_ATTEMPTS})...");
-            Invoke(nameof(InitializeTooltip), 0.1f);
-            return;
-        }
-
         tooltipPanelObject = uiManager.GetPanel(UIManager.PanelType.Tooltip);
         if (tooltipPanelObject != null)
         {
@@ -59,6 +40,10 @@ public class TooltipManager : MonoBehaviour
         if (tooltip != null)
         {
             tooltip.ShowTooltip(skill, mousePosition);
+        }
+        else
+        {
+            Debug.LogWarning("Tooltip не инициализирован!");
         }
     }
 

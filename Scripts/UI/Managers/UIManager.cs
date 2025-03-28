@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-
-public class UIManager : MonoBehaviour
+public class UIManager : MonoBehaviour, IUIManager
 {
     public enum PanelType
     {
@@ -18,7 +17,7 @@ public class UIManager : MonoBehaviour
         public PanelType panelType;
         public GameObject panelObject;
         public MonoBehaviour[] scriptsToDisable;
-        public List<PanelConfig> childPanels = new List<PanelConfig>(); // Дочерние панели
+        public List<PanelConfig> childPanels = new List<PanelConfig>();
     }
 
     [System.Serializable]
@@ -30,30 +29,27 @@ public class UIManager : MonoBehaviour
     }
 
     [SerializeField] private List<PanelConfig> panelConfigs = new List<PanelConfig>();
-    private SkillTreeNavigation skillTreeNavigation;
-    private SkillTreeManager skillTreeManager;
-    private NotificationManager notificationManager;
+    [InjectAttribute1]
+    private ISkillTreeNavigation skillTreeNavigation { get; set; }
+    [InjectAttribute1]
+    private ISkillTreeManager skillLogicManager{ get; set; }
+    [InjectAttribute1]
+    private ISkillUIManager skillUIManager{ get; set; }
+    [InjectAttribute1]
+    private INotificationManager notificationManager{ get; set; }
     [SerializeField] private List<PanelScriptControl> panelScriptControls = new List<PanelScriptControl>();
-    private Dictionary<PanelType, GameObject> panelCache = new Dictionary<PanelType, GameObject>(); // Кэш панелей
+    private Dictionary<PanelType, GameObject> panelCache = new Dictionary<PanelType, GameObject>();
 
     private IPanel currentPanel;
     private Dictionary<KeyCode, PanelType> keyMap;
 
-    //public static UIManager Instance { get; private set; }
     void Awake()
     {
-        DependencyContainer container = DependencyContainer.Instance;
-        skillTreeManager = container.Resolve<SkillTreeManager>();
-        notificationManager = container.Resolve<NotificationManager>();
-        skillTreeNavigation = container.Resolve<SkillTreeNavigation>(); // Если его нет в контейнере, нужно зарегистрировать
+        // Проверяем на дубликаты
 
-        if (skillTreeManager == null) Debug.LogError("SkillTreeManager не зарегистрирован!");
-        if (notificationManager == null) Debug.LogError("NotificationManager не зарегистрирован!");
-        if (skillTreeNavigation == null) Debug.LogError("SkillTreeNavigation не зарегистрирован!");
+        //DependencyContainer.Instance.RegisterManual(this);
+
         InitializePanelSystem();
-
-        if (skillTreeNavigation == null) Debug.LogError("SkillTreeNavigation не назначен в UIManager!");
-        if (skillTreeManager == null) Debug.LogError("SkillTreeManager не назначен в UIManager!");
 
         keyMap = new Dictionary<KeyCode, PanelType>
         {
@@ -63,12 +59,17 @@ public class UIManager : MonoBehaviour
         };
 
         Cursor.visible = false;
-        CachePanels(); // Кэшируем панели при старте
-        HideAllPanels();
+        CachePanels();
     }
+    void Start()
+    {
+        HideAllPanels(); // Moved to Start to ensure all Awake() methods have completed
+    }
+
+    // Остальной код UIManager без изменений...
     private void CachePanels()
     {
-        panelCache.Clear(); // Очищаем кэш на случай повторного вызова
+        panelCache.Clear();
         CachePanelsRecursive(panelConfigs);
     }
 
@@ -92,11 +93,10 @@ public class UIManager : MonoBehaviour
             {
                 Debug.LogError($"PanelObject для типа {config.panelType} не назначен!");
             }
-            CachePanelsRecursive(config.childPanels); // Рекурсивно кэшируем дочерние панели
+            CachePanelsRecursive(config.childPanels);
         }
     }
 
-    // Метод для получения панели из кэша
     public GameObject GetPanel(PanelType panelType)
     {
         if (panelCache.TryGetValue(panelType, out GameObject panel))
@@ -107,7 +107,6 @@ public class UIManager : MonoBehaviour
         return null;
     }
 
-    // Метод для доступа к panelConfigs (если нужно снаружи)
     public List<PanelConfig> GetPanelConfigs()
     {
         return panelConfigs;
@@ -129,7 +128,6 @@ public class UIManager : MonoBehaviour
                         return;
                     }
                 }
-
                 CloseCurrentPanel();
             }
             else
@@ -159,7 +157,6 @@ public class UIManager : MonoBehaviour
             }
             return;
         }
-
         OpenPanel(panelType);
     }
 
@@ -244,15 +241,15 @@ public class UIManager : MonoBehaviour
         var skillTreeConfig = FindPanelConfigByType(panelConfigs, PanelType.SkillTree);
         bool isSkillTreeActive = skillTreeConfig != null && skillTreeConfig.panelObject != null && skillTreeConfig.panelObject.activeInHierarchy;
 
-        if (skillTreeNavigation != null)
-        {
-            skillTreeNavigation.enabled = isSkillTreeActive;
-        }
+        // if (skillTreeNavigation != null)
+        // {
+        //     skillTreeNavigation.enabled = isSkillTreeActive;
+        // }
 
-        if (skillTreeManager != null)
-        {
-            skillTreeManager.enabled = isSkillTreeActive;
-        }
+        // if (skillUIManager != null)
+        // {
+        //     skillUIManager.enabled = isSkillTreeActive;
+        // }
     }
 
     private void UpdateScriptStates(PanelType? activePanelType)

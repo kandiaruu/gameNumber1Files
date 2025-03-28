@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class SkillTreeNavigation : MonoBehaviour
+public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 {
     [SerializeField] private RectTransform skillHolder;
     [SerializeField] private RectTransform skillTreeContainer;
@@ -13,29 +13,20 @@ public class SkillTreeNavigation : MonoBehaviour
     private Vector2 originalPivot;
     private bool dragStartedInContainer = false;
 
-    private SkillTreeManager skillTreeManager; // Ссылка на SkillTreeManager
+    [InjectAttribute1] private ISkillNotificationHandler notificationHandler { get; set; }
 
     private void Awake()
     {
-        DependencyContainer container = DependencyContainer.Instance;
-        skillTreeManager = container.Resolve<SkillTreeManager>();
-        if (skillTreeManager == null) Debug.LogError("skillTreeManager не зарегистрирован в DependencyContainer!");
-        if (skillHolder == null || skillTreeContainer == null || skillTreeManager == null)
-        {
-            Debug.LogError("SkillHolder, SkillTreeContainer или SkillTreeManager не назначены!");
-            enabled = false;
-            return;
-        }
         skillHolder.anchoredPosition = new Vector2(960f, -455f);
         originalPivot = skillHolder.pivot;
-        Debug.Log("Инициализация завершена. Начальная позиция: " + skillHolder.anchoredPosition);
+        Debug.Log("SkillTreeNavigation initialized. Initial position: " + skillHolder.anchoredPosition);
     }
 
     private void Update()
     {
         // Проверяем, находится ли курсор мыши над областью SkillTreeContainer и уведомление не активно
         bool isMouseOverContainer = RectTransformUtility.RectangleContainsScreenPoint(skillTreeContainer, Input.mousePosition);
-        bool isNotificationActive = skillTreeManager != null && skillTreeManager.skillNotificationPanelActive;
+        bool isNotificationActive = notificationHandler != null && notificationHandler.skillNotificationPanelActive;
 
         if (!isNotificationActive && isMouseOverContainer)
         {
@@ -50,7 +41,7 @@ public class SkillTreeNavigation : MonoBehaviour
                 isDragging = true;
                 dragStartedInContainer = true;
                 dragOrigin = Input.mousePosition;
-                Debug.Log("Перетаскивание начато внутри контейнера.");
+                Debug.Log("Dragging started inside container. isDragging: " + isDragging);
             }
         }
 
@@ -59,7 +50,7 @@ public class SkillTreeNavigation : MonoBehaviour
         {
             isDragging = false;
             dragStartedInContainer = false;
-            Debug.Log("Перетаскивание завершено.");
+            Debug.Log("Dragging ended. isDragging: " + isDragging);
         }
 
         // Обработка перетаскивания, если оно началось внутри контейнера и уведомление не активно
@@ -93,6 +84,7 @@ public class SkillTreeNavigation : MonoBehaviour
         Vector2 newPosition = currentPosition - positionDelta;
 
         skillHolder.anchoredPosition = ClampPosition(newPosition);
+        Debug.Log("Zoomed: New scale: " + newScale + ", New position: " + skillHolder.anchoredPosition);
     }
 
     private Vector2 ClampPosition(Vector2 position)
@@ -115,6 +107,6 @@ public class SkillTreeNavigation : MonoBehaviour
     {
         skillHolder.anchoredPosition = Vector2.zero;
         skillHolder.localScale = Vector3.one;
-        Debug.Log("Навигация сброшена.");
+        Debug.Log("Navigation reset.");
     }
 }

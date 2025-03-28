@@ -11,19 +11,18 @@ public class Skill
     public bool isUnlocked;
     public int[] prerequisiteIndices;
 
-    [SerializeField] public int requiredPrerequisiteCount; // Новое поле: сколько требований нужно выполнить
+    [SerializeField] public int requiredPrerequisiteCount; // Сколько требований нужно выполнить
 
     public Button skillButton;
     public GameObject lockIcon;
 
-    [SerializeField] private SkillTreeNavigation skillTreeNavigation; // Ссылка на скрипт SkillTreeNavigation
     [System.NonSerialized] public Vector3 originalPosition;
     [System.NonSerialized] public RectTransform lockIconTransform;
     [System.NonSerialized] public bool isShaking = false;
     [System.NonSerialized] private Image lockImage;
     [System.NonSerialized] private Color originalColor;
 
-    public GameObject questionIcon; // Новый объект для знака ?
+    public GameObject questionIcon; // Объект для знака ?
     [System.NonSerialized] public bool hasQuestionState = false; // Флаг состояния ?
     [SerializeField] public bool hasQuestionByDefault = true; // Флаг по умолчанию для ?
     public int questionGoldCost = 5; // Индивидуальная стоимость золота для покупки ?
@@ -32,10 +31,34 @@ public class Skill
     public string[] characteristics;
     public int maxUpgrades;
 
+    // Метод для инициализации
+    public void Initialize()
+    {
+        if (skillButton == null)
+        {
+            Debug.LogError($"skillButton не назначен для навыка {skillName}");
+            return;
+        }
+        if (lockIcon == null || questionIcon == null)
+        {
+            Debug.LogError($"lockIcon или questionIcon не назначены для навыка {skillName}");
+            return;
+        }
+
+        // Инициализируем lockIconTransform
+        lockIconTransform = lockIcon.GetComponent<RectTransform>();
+        if (lockIconTransform != null)
+        {
+            originalPosition = lockIconTransform.anchoredPosition;
+        }
+
+        // Устанавливаем hasQuestionState на основе hasQuestionByDefault
+        hasQuestionState = !hasQuestionByDefault;
+    }
+
     // Конструктор для установки начального значения requiredPrerequisiteCount
     public Skill()
     {
-        // Устанавливаем значение по умолчанию в конструкторе
         requiredPrerequisiteCount = prerequisiteIndices != null ? prerequisiteIndices.Length : 0;
     }
 
@@ -109,5 +132,3 @@ public class Skill
         isShaking = false;
     }
 }
-
-// в инспекторе можно назанчить сколько "обязательных требований" нужно выполнить для разблокировки навыка
