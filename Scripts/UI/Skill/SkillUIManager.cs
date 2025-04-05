@@ -15,9 +15,8 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
 
     void Awake()
     {
-        // InjectDependencies теперь вызывается в GameBootstrap.Awake
         ValidateUIElements();
-        InitializeUI(); // Переносим сюда
+        InitializeUI();
     }
 
     void Start()
@@ -33,18 +32,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         SkillLogicManager.OnSkillPointsChanged += points => skillPointsText.text = $"Очки навыков: {points}";
         SkillLogicManager.OnGoldChanged += gold => goldText.text = $"Золото: {gold}";
         SkillLogicManager.OnSkillsUpdated += RefreshAllSkills;
-    }
 
-    public void EnsureDependencies()
-    {
-        if (SkillLogicManager == null)
-        {
-            throw new System.NullReferenceException("SkillLogicManager is not injected!");
-        }
-        else
-        {
-            Debug.Log("SkillLogicManager is injected!");
-        }
+        // Отключаем изменение цвета при нажатии для всех кнопок
+        DisableButtonColorChange();
     }
 
     private void ValidateUIElements()
@@ -79,6 +69,26 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         skillPointsText.text = $"Очки навыков: {SkillLogicManager.GetSkillPoints()}";
         goldText.text = $"Золото: {SkillLogicManager.GetGold()}";
         RefreshAllSkills();
+    }
+
+    private void DisableButtonColorChange()
+    {
+        var skills = SkillLogicManager.GetAllSkills();
+        if (skills == null) return;
+
+        foreach (var skill in skills)
+        {
+            if (skill.skillButton != null)
+            {
+                ColorBlock colors = skill.skillButton.colors;
+                // Устанавливаем одинаковый цвет для всех состояний
+                colors.highlightedColor = colors.normalColor;
+                colors.pressedColor = colors.normalColor;
+                colors.selectedColor = colors.normalColor;
+                colors.colorMultiplier = 1f; // Убираем затемнение/осветление
+                skill.skillButton.colors = colors;
+            }
+        }
     }
 
     public void RefreshAllSkills()
@@ -123,7 +133,11 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
                 {
                     if (i < originalColorBlocks.Length && originalColorBlocks[i] != null)
                     {
-                        button.colors = originalColorBlocks[i];
+                        ColorBlock colors = originalColorBlocks[i];
+                        colors.highlightedColor = colors.normalColor;
+                        colors.pressedColor = colors.normalColor;
+                        colors.selectedColor = colors.normalColor;
+                        button.colors = colors;
                     }
                     button.interactable = true;
                 }
@@ -137,6 +151,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
                         }
                         ColorBlock tempColorBlock = button.colors;
                         tempColorBlock.disabledColor = tempColorBlock.normalColor;
+                        tempColorBlock.highlightedColor = tempColorBlock.normalColor;
+                        tempColorBlock.pressedColor = tempColorBlock.normalColor;
+                        tempColorBlock.selectedColor = tempColorBlock.normalColor;
                         tempColorBlock.colorMultiplier = 1f;
                         button.colors = tempColorBlock;
                         button.interactable = false;

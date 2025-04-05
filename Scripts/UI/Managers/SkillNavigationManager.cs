@@ -19,7 +19,6 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
     {
         skillHolder.anchoredPosition = new Vector2(960f, -455f);
         originalPivot = skillHolder.pivot;
-        Debug.Log("SkillTreeNavigation initialized. Initial position: " + skillHolder.anchoredPosition);
     }
 
     private void Update()
@@ -84,7 +83,6 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
         Vector2 newPosition = currentPosition - positionDelta;
 
         skillHolder.anchoredPosition = ClampPosition(newPosition);
-        Debug.Log("Zoomed: New scale: " + newScale + ", New position: " + skillHolder.anchoredPosition);
     }
 
     private Vector2 ClampPosition(Vector2 position)
@@ -108,5 +106,10 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
         skillHolder.anchoredPosition = Vector2.zero;
         skillHolder.localScale = Vector3.one;
         Debug.Log("Navigation reset.");
+    }
+    private void OnDisable()
+    {
+        isDragging = false;
+        dragStartedInContainer = false;
     }
 }

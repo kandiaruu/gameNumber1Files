@@ -29,16 +29,6 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         SkillUIManager.RefreshAllSkills();
     }
 
-    public void EnsureDependencies()
-    {
-        if (SkillUIManager == null)
-        {
-            throw new System.NullReferenceException("SkillUIManager is not injected!");
-        }else {
-            Debug.Log("SkillUIManager is injected!");
-        }
-    }
-
     public void UnlockSkill(int skillIndex)
     {
         Skill skill = skills.FirstOrDefault(s => s.skillIndex == skillIndex);

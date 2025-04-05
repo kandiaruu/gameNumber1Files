@@ -18,6 +18,7 @@ public class UIManager : MonoBehaviour, IUIManager
         public GameObject panelObject;
         public MonoBehaviour[] scriptsToDisable;
         public List<PanelConfig> childPanels = new List<PanelConfig>();
+        
     }
 
     [System.Serializable]
@@ -29,16 +30,13 @@ public class UIManager : MonoBehaviour, IUIManager
     }
 
     [SerializeField] private List<PanelConfig> panelConfigs = new List<PanelConfig>();
-    [InjectAttribute1]
-    private ISkillTreeNavigation skillTreeNavigation { get; set; }
-    [InjectAttribute1]
-    private ISkillTreeManager skillLogicManager{ get; set; }
-    [InjectAttribute1]
-    private ISkillUIManager skillUIManager{ get; set; }
-    [InjectAttribute1]
-    private INotificationManager notificationManager{ get; set; }
+    [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
+    [InjectAttribute1] private ISkillTreeManager skillLogicManager{ get; set; }
+    [InjectAttribute1] private ISkillUIManager skillUIManager{ get; set; }
+    [InjectAttribute1] private INotificationManager notificationManager{ get; set; }
     [SerializeField] private List<PanelScriptControl> panelScriptControls = new List<PanelScriptControl>();
     private Dictionary<PanelType, GameObject> panelCache = new Dictionary<PanelType, GameObject>();
+    private const int MAX_DEPTH = 5; // Максимальная глубина иерархии
 
     private IPanel currentPanel;
     private Dictionary<KeyCode, PanelType> keyMap;
@@ -65,6 +63,7 @@ public class UIManager : MonoBehaviour, IUIManager
     {
         HideAllPanels(); // Moved to Start to ensure all Awake() methods have completed
     }
+    
 
     // Остальной код UIManager без изменений...
     private void CachePanels()
@@ -86,7 +85,6 @@ public class UIManager : MonoBehaviour, IUIManager
                 else
                 {
                     panelCache[config.panelType] = config.panelObject;
-                    Debug.Log($"Кэширована панель: {config.panelType} -> {config.panelObject.name}");
                 }
             }
             else
@@ -241,15 +239,29 @@ public class UIManager : MonoBehaviour, IUIManager
         var skillTreeConfig = FindPanelConfigByType(panelConfigs, PanelType.SkillTree);
         bool isSkillTreeActive = skillTreeConfig != null && skillTreeConfig.panelObject != null && skillTreeConfig.panelObject.activeInHierarchy;
 
-        // if (skillTreeNavigation != null)
-        // {
-        //     skillTreeNavigation.enabled = isSkillTreeActive;
-        // }
+        if (skillTreeNavigation != null)
+        {
+            if (skillTreeNavigation is MonoBehaviour skillTreeBehaviour)
+            {
+                skillTreeBehaviour.enabled = isSkillTreeActive;
+            }
+            else
+            {
+                Debug.LogWarning("skillTreeNavigation does not inherit from MonoBehaviour and cannot be enabled/disabled.");
+            }
+        }
 
-        // if (skillUIManager != null)
-        // {
-        //     skillUIManager.enabled = isSkillTreeActive;
-        // }
+        if (skillUIManager != null)
+        {
+            if (skillUIManager is MonoBehaviour skillUIBehaviour)
+            {
+                skillUIBehaviour.enabled = isSkillTreeActive;
+            }
+            else
+            {
+                Debug.LogWarning("skillUIManager does not inherit from MonoBehaviour and cannot be enabled/disabled.");
+            }
+        }
     }
 
     private void UpdateScriptStates(PanelType? activePanelType)
@@ -289,13 +301,27 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
-    private void InitializePanelRecursive(PanelConfig config)
+    private void InitializePanelRecursive(PanelConfig config, int currentDepth = 0, HashSet<PanelConfig> visited = null)
     {
-        if (config.panelObject == null)
+        if (currentDepth >= MAX_DEPTH)
         {
-            Debug.LogError($"Панель {config.panelType} не назначена в инспекторе!");
+            Debug.LogError($"Превышена максимальная глубина иерархии ({MAX_DEPTH}) для панели {config.panelType}!");
             return;
         }
+
+        if (config == null || config.panelObject == null)
+        {
+            Debug.LogError($"Панель {config?.panelType} не назначена или некорректна!");
+            return;
+        }
+
+        visited = visited ?? new HashSet<PanelConfig>();
+        if (!visited.Add(config))
+        {
+            Debug.LogError($"Обнаружен цикл в конфигурации панели {config.panelType}!");
+            return;
+        }
+
         if (!config.panelObject.GetComponent<BasePanel>())
         {
             config.panelObject.AddComponent<BasePanel>();
@@ -304,7 +330,7 @@ public class UIManager : MonoBehaviour, IUIManager
         var panel = config.panelObject.GetComponent<IPanel>();
         foreach (var childConfig in config.childPanels)
         {
-            InitializePanelRecursive(childConfig);
+            InitializePanelRecursive(childConfig, currentDepth + 1, visited);
             if (childConfig.panelObject != null)
             {
                 var childPanel = childConfig.panelObject.GetComponent<IPanel>();

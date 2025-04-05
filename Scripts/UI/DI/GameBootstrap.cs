@@ -43,8 +43,6 @@ public class GameBootstrap : MonoBehaviour
 
     void Awake()
     {
-        Debug.Log("GameBootstrap Awake started");
-
         if (_dependencyFields == null)
         {
             _dependencyFields = GetDependencyFields();
@@ -54,8 +52,6 @@ public class GameBootstrap : MonoBehaviour
         RegisterAllDependencies();
         SetupDependencies();
         InjectDependencies();
-
-        Debug.Log("GameBootstrap Awake finished");
     }
 
     private void RegisterAllDependencies()
@@ -99,7 +95,6 @@ public class GameBootstrap : MonoBehaviour
         {
             if (_registeredTypes.Add(interfaceType))
             {
-                Debug.Log($"Registering {interfaceType.Name} -> {implType.Name} as {lifecycle}");
                 if (!_methodCache.TryGetValue($"Register_{interfaceType.Name}_{implType.Name}", out var registerDelegate))
                 {
                     var registerMethod = typeof(DependencyContainer1)
@@ -140,7 +135,6 @@ public class GameBootstrap : MonoBehaviour
 
             foreach (var interfaceType in attr.InterfaceTypes)
             {
-                Debug.Log($"{field.Name} found, adding to singletons as {interfaceType.Name}.");
                 if (!_methodCache.TryGetValue($"AddSingleton_{interfaceType.Name}", out var addSingletonDelegate))
                 {
                     var addSingletonMethod = typeof(DependencyContainer1)
@@ -161,7 +155,6 @@ public class GameBootstrap : MonoBehaviour
                 var interfaceType = instance.GetType().GetInterfaces().FirstOrDefault(i => _registeredTypes.Contains(i));
                 if (interfaceType != null)
                 {
-                    Debug.Log($"{field.Name} found, adding to singletons as {interfaceType.Name}.");
                     if (!_methodCache.TryGetValue($"AddSingleton_{interfaceType.Name}", out var addSingletonDelegate))
                     {
                         var addSingletonMethod = typeof(DependencyContainer1)
@@ -198,7 +191,6 @@ public class GameBootstrap : MonoBehaviour
 
         foreach (var instance in allInstances)
         {
-            Debug.Log($"Injecting dependencies into {instance.GetType().Name}");
             DependencyContainer1.InjectDependencies(instance);
 
             if (!_methodCache.TryGetValue($"EnsureDependencies_{instance.GetType().Name}", out var ensureDelegate))

@@ -9,15 +9,29 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
     private Skill lastHoveredSkill;
     private bool wasDraggingLastFrame = false;
+    private bool isMousePressed;
+    private float pressStartTime;
+    private float clickThreshold = 0.2f; // Порог времени для быстрого клика в секундах
 
     private void Start()
     {
-        DependencyContainer1.InjectDependencies(this); // Добавляем инъекцию
+        DependencyContainer1.InjectDependencies(this);
         InitializeSkills();
     }
 
     private void Update()
     {
+        // Отслеживание нажатия мыши с использованием unscaled time
+        if (Input.GetMouseButtonDown(0))
+        {
+            isMousePressed = true;
+            pressStartTime = Time.unscaledTime;
+        }
+        if (Input.GetMouseButtonUp(0))
+        {
+            isMousePressed = false;
+        }
+
         if (skillTreeNavigation != null && !notificationHandler.skillNotificationPanelActive)
         {
             if (skillTreeNavigation.isDragging)
@@ -52,9 +66,11 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
                 var trigger = skill.skillButton.gameObject.GetComponent<EventTrigger>() ?? skill.skillButton.gameObject.AddComponent<EventTrigger>();
                 AddEventTrigger(trigger, EventTriggerType.PointerEnter, () => OnPointerEnter(skill));
                 AddEventTrigger(trigger, EventTriggerType.PointerExit, OnPointerExit);
+                
                 skill.skillButton.onClick.AddListener(() =>
                 {
-                    if (!skill.isUnlocked && notificationHandler != null)
+                    float pressDuration = Time.unscaledTime - pressStartTime;
+                    if (pressDuration <= clickThreshold && !skill.isUnlocked && notificationHandler != null)
                     {
                         notificationHandler.ShowNotification(skill);
                     }
