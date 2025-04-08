@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Linq;
+using System.Collections.Generic;
 
 public class SkillUIManager : MonoBehaviour, ISkillUIManager
 {
@@ -9,12 +10,13 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
     [SerializeField] private TextMeshProUGUI goldText;
     [SerializeField] private Button skillsResetButton;
     [SerializeField] private Button resetQuestionsButton;
-    [InjectAttribute1]
-    private ISkillTreeManager SkillLogicManager { get; set; }
-    private ColorBlock[] originalColorBlocks;
+    [InjectAttribute1] private ISkillTreeManager SkillLogicManager { get; set; }
+    [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; } // Добавляем доступ к текущей группе
+    private Dictionary<string, ColorBlock[]> originalColorBlocks;
 
     void Awake()
     {
+        DependencyContainer1.InjectDependencies(this);
         ValidateUIElements();
         InitializeUI();
     }
@@ -25,15 +27,26 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         {
             throw new System.NullReferenceException("SkillLogicManager is not injected!");
         }
+        if (skillTreeNavigation == null)
+        {
+            throw new System.NullReferenceException("SkillTreeNavigation is not injected!");
+        }
 
-        skillsResetButton.onClick.AddListener(SkillLogicManager.ResetSkills);
-        resetQuestionsButton.onClick.AddListener(SkillLogicManager.ResetQuestionsAndGold);
+        skillsResetButton.onClick.AddListener(() => 
+        {
+            string currentGroup = skillTreeNavigation.CurrentGroupName;
+            SkillLogicManager.ResetSkills(currentGroup); // Сбрасываем только текущую группу
+        });
+        resetQuestionsButton.onClick.AddListener(() => 
+        {
+            string currentGroup = skillTreeNavigation.CurrentGroupName;
+            SkillLogicManager.ResetQuestionsAndGold(currentGroup); // Сбрасываем только текущую группу
+        });
 
         SkillLogicManager.OnSkillPointsChanged += points => skillPointsText.text = $"Очки навыков: {points}";
         SkillLogicManager.OnGoldChanged += gold => goldText.text = $"Золото: {gold}";
         SkillLogicManager.OnSkillsUpdated += RefreshAllSkills;
 
-        // Отключаем изменение цвета при нажатии для всех кнопок
         DisableButtonColorChange();
     }
 
@@ -47,25 +60,34 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
 
     private void InitializeUI()
     {
-        var skills = SkillLogicManager.GetAllSkills();
-        if (skills == null)
+        var allSkills = SkillLogicManager?.GetAllSkills();
+        if (allSkills == null)
         {
             Debug.LogError("GetAllSkills returned null!");
             return;
         }
 
-        originalColorBlocks = new ColorBlock[skills.Length];
-        for (int i = 0; i < skills.Length; i++)
+        var skillGroups = SkillLogicManager?.GetSkillGroups();
+        if (skillGroups == null)
         {
-            if (skills[i].skillButton != null)
+            Debug.LogError("GetSkillGroups returned null!");
+            return;
+        }
+
+        originalColorBlocks = new Dictionary<string, ColorBlock[]>();
+        foreach (var group in skillGroups)
+        {
+            var skills = SkillLogicManager.GetAllSkillsInGroup(group.groupName);
+            originalColorBlocks[group.groupName] = new ColorBlock[skills.Length];
+            for (int i = 0; i < skills.Length; i++)
             {
-                originalColorBlocks[i] = skills[i].skillButton.colors;
-            }
-            else
-            {
-                Debug.LogWarning($"skills[{i}].skillButton is null in SkillUIManager!");
+                if (skills[i].skillButton != null)
+                {
+                    originalColorBlocks[group.groupName][i] = skills[i].skillButton.colors;
+                }
             }
         }
+
         skillPointsText.text = $"Очки навыков: {SkillLogicManager.GetSkillPoints()}";
         goldText.text = $"Золото: {SkillLogicManager.GetGold()}";
         RefreshAllSkills();
@@ -73,19 +95,18 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
 
     private void DisableButtonColorChange()
     {
-        var skills = SkillLogicManager.GetAllSkills();
-        if (skills == null) return;
+        var allSkills = SkillLogicManager?.GetAllSkills();
+        if (allSkills == null) return;
 
-        foreach (var skill in skills)
+        foreach (var skill in allSkills)
         {
             if (skill.skillButton != null)
             {
                 ColorBlock colors = skill.skillButton.colors;
-                // Устанавливаем одинаковый цвет для всех состояний
                 colors.highlightedColor = colors.normalColor;
                 colors.pressedColor = colors.normalColor;
                 colors.selectedColor = colors.normalColor;
-                colors.colorMultiplier = 1f; // Убираем затемнение/осветление
+                colors.colorMultiplier = 1f;
                 skill.skillButton.colors = colors;
             }
         }
@@ -95,68 +116,76 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
     {
         if (SkillLogicManager == null) return;
 
-        var skills = SkillLogicManager.GetAllSkills();
-        if (skills == null) return;
+        var allSkills = SkillLogicManager.GetAllSkills();
+        if (allSkills == null) return;
 
-        foreach (var skill in skills)
+        foreach (var skill in allSkills)
         {
-            skill.UpdateUI(SkillLogicManager.GetSkillPoints() >= skill.cost, skills);
+            skill.UpdateUI(SkillLogicManager.GetSkillPoints() >= skill.cost, 
+                SkillLogicManager.GetAllSkillsInGroup(GetGroupNameForSkill(skill)));
         }
+    }
+
+    private string GetGroupNameForSkill(Skill skill)
+    {
+        var skillGroups = SkillLogicManager.GetSkillGroups();
+        foreach (var group in skillGroups)
+        {
+            if (group.skills.Contains(skill))
+                return group.groupName;
+        }
+        Debug.LogWarning($"Skill {skill.skillName} not found in any group!");
+        return string.Empty;
     }
 
     public void EnableSkillButtons(bool enable)
     {
-        if (SkillLogicManager == null)
-        {
-            Debug.LogError("SkillLogicManager is null in EnableSkillButtons!");
-            return;
-        }
-        if (originalColorBlocks == null)
-        {
-            Debug.LogError("originalColorBlocks is not initialized!");
-            return;
-        }
+        if (SkillLogicManager == null || originalColorBlocks == null) return;
 
-        var skills = SkillLogicManager.GetAllSkills();
-        if (skills == null)
-        {
-            Debug.LogError("skills array is null!");
-            return;
-        }
+        var allSkills = SkillLogicManager.GetAllSkills();
+        if (allSkills == null) return;
 
-        for (int i = 0; i < skills.Length; i++)
+        var skillGroups = SkillLogicManager.GetSkillGroups();
+        if (skillGroups == null) return;
+
+        foreach (var group in skillGroups)
         {
-            if (skills[i].skillButton != null)
+            var skills = SkillLogicManager.GetAllSkillsInGroup(group.groupName);
+            for (int i = 0; i < skills.Length; i++)
             {
-                Button button = skills[i].skillButton;
-                if (enable)
+                if (skills[i].skillButton != null)
                 {
-                    if (i < originalColorBlocks.Length && originalColorBlocks[i] != null)
+                    Button button = skills[i].skillButton;
+                    if (enable)
                     {
-                        ColorBlock colors = originalColorBlocks[i];
-                        colors.highlightedColor = colors.normalColor;
-                        colors.pressedColor = colors.normalColor;
-                        colors.selectedColor = colors.normalColor;
-                        button.colors = colors;
-                    }
-                    button.interactable = true;
-                }
-                else
-                {
-                    if (i < originalColorBlocks.Length)
-                    {
-                        if (originalColorBlocks[i] == null)
+                        if (originalColorBlocks.ContainsKey(group.groupName) && 
+                            i < originalColorBlocks[group.groupName].Length)
                         {
-                            originalColorBlocks[i] = button.colors;
+                            ColorBlock colors = originalColorBlocks[group.groupName][i];
+                            colors.highlightedColor = colors.normalColor;
+                            colors.pressedColor = colors.normalColor;
+                            colors.selectedColor = colors.normalColor;
+                            button.colors = colors;
                         }
-                        ColorBlock tempColorBlock = button.colors;
-                        tempColorBlock.disabledColor = tempColorBlock.normalColor;
-                        tempColorBlock.highlightedColor = tempColorBlock.normalColor;
-                        tempColorBlock.pressedColor = tempColorBlock.normalColor;
-                        tempColorBlock.selectedColor = tempColorBlock.normalColor;
-                        tempColorBlock.colorMultiplier = 1f;
-                        button.colors = tempColorBlock;
-                        button.interactable = false;
+                        button.interactable = true;
+                    }
+                    else
+                    {
+                        if (originalColorBlocks.ContainsKey(group.groupName))
+                        {
+                            if (originalColorBlocks[group.groupName][i] == null)
+                            {
+                                originalColorBlocks[group.groupName][i] = button.colors;
+                            }
+                            ColorBlock tempColorBlock = button.colors;
+                            tempColorBlock.disabledColor = tempColorBlock.normalColor;
+                            tempColorBlock.highlightedColor = tempColorBlock.normalColor;
+                            tempColorBlock.pressedColor = tempColorBlock.normalColor;
+                            tempColorBlock.selectedColor = tempColorBlock.normalColor;
+                            tempColorBlock.colorMultiplier = 1f;
+                            button.colors = tempColorBlock;
+                            button.interactable = false;
+                        }
                     }
                 }
             }

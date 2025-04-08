@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using System.Linq;
 
 public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 {
@@ -11,7 +12,7 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
     private bool wasDraggingLastFrame = false;
     private bool isMousePressed;
     private float pressStartTime;
-    private float clickThreshold = 0.2f; // Порог времени для быстрого клика в секундах
+    private float clickThreshold = 0.2f;
 
     private void Start()
     {
@@ -21,7 +22,6 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 
     private void Update()
     {
-        // Отслеживание нажатия мыши с использованием unscaled time
         if (Input.GetMouseButtonDown(0))
         {
             isMousePressed = true;
@@ -92,6 +92,12 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 
     public void OnPointerEnter(Skill skill)
     {
+        string currentGroup = skillTreeNavigation?.CurrentGroupName;
+        if (string.IsNullOrEmpty(currentGroup) || !IsSkillInCurrentGroup(skill, currentGroup))
+        {
+            return;
+        }
+
         if (!skill.questionIcon.activeSelf && !skillTreeNavigation.isDragging && !notificationHandler.skillNotificationPanelActive)
         {
             tooltipManager.ShowTooltip(skill, Input.mousePosition);
@@ -106,7 +112,14 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 
     private void CheckHoverAfterDrag()
     {
-        var skills = skillTreeManager.GetAllSkills();
+        string currentGroup = skillTreeNavigation?.CurrentGroupName;
+        if (string.IsNullOrEmpty(currentGroup))
+        {
+            Debug.LogWarning("Current group is not set in SkillTreeNavigation!");
+            return;
+        }
+
+        var skills = skillTreeManager.GetAllSkillsInGroup(currentGroup);
         foreach (var skill in skills)
         {
             if (skill.skillButton != null && RectTransformUtility.RectangleContainsScreenPoint(skill.skillButton.GetComponent<RectTransform>(), Input.mousePosition))
@@ -116,5 +129,24 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
                 break;
             }
         }
+    }
+
+    private bool IsSkillInCurrentGroup(Skill skill, string currentGroup)
+    {
+        var skillGroups = skillTreeManager.GetSkillGroups();
+        if (skillGroups == null)
+        {
+            Debug.LogError("skillGroups is null in IsSkillInCurrentGroup!");
+            return false;
+        }
+
+        var group = skillGroups.FirstOrDefault(g => g.groupName == currentGroup);
+        if (group == null)
+        {
+            Debug.LogWarning($"Group {currentGroup} not found!");
+            return false;
+        }
+
+        return group.skills.Contains(skill);
     }
 }

@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
 {
@@ -22,7 +23,6 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
     public override void Awake()
     {
         DependencyContainer1.InjectDependencies(this);
-        //DependencyContainer.Instance.RegisterManual(this);
         base.Awake();
         notificationRect = GetComponent<RectTransform>();
         if (notificationRect == null) Debug.LogError("RectTransform для SkillNotificationPanel не найден!");
@@ -36,17 +36,35 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
         Debug.Log("ShowNotification вызван для " + skill.skillName);
         currentSkill = skill;
         skillLogicManager = skillTreeManager ?? skillLogicManager;
+        if (skillLogicManager == null)
+        {
+            Debug.LogError("skillLogicManager не инициализирован!");
+            return;
+        }
+
         Open();
         ClearButtons();
+
+        string groupName = GetGroupNameForSkill(skill);
+        if (string.IsNullOrEmpty(groupName))
+        {
+            Debug.LogError($"Не удалось найти группу для навыка {skill.skillName}");
+            Close();
+            return;
+        }
 
         if (!skill.hasQuestionState)
         {
             notificationText.text = $"Навык \"{skill.skillName}\" скрыт.\n" +
                                    $"Стоимость раскрытия: {skill.questionGoldCost} золота.";
-            AddButton("Купить", () => { skillLogicManager.BuyQuestionState(skill.skillIndex); Close(); });
+            AddButton("Купить", () => 
+            { 
+                skillLogicManager.BuyQuestionState(groupName, skill.skillIndex); 
+                Close(); 
+            });
             AddButton("Отмена", Close);
         }
-        else if (!skill.CanUnlock(skillLogicManager.GetAllSkills()))
+        else if (!skill.CanUnlock(skillLogicManager.GetAllSkillsInGroup(groupName)))
         {
             notificationText.text = $"Навык \"{skill.skillName}\" заблокирован.\n" +
                                    $"Не выполнены обязательные требования.";
@@ -62,11 +80,15 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
         {
             notificationText.text = $"Разблокировать навык \"{skill.skillName}\"?\n" +
                                    $"Стоимость: {skill.cost} очков навыков.";
-            AddButton("Разблокировать", () => { skillLogicManager.UnlockSkill(skill.skillIndex); Close(); });
+            AddButton("Разблокировать", () => 
+            { 
+                skillLogicManager.UnlockSkill(groupName, skill.skillIndex); 
+                Close(); 
+            });
             AddButton("Отмена", Close);
         }
 
-        skillUIManager.EnableSkillButtons(false);
+        skillUIManager?.EnableSkillButtons(false);
     }
 
     protected override void OnClose()
@@ -77,7 +99,7 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
             skillUIManager.EnableSkillButtons(true);
         }
         currentSkill = null;
-        skillLogicManager = null;
+        // Не обнуляем skillLogicManager, если он инжектируется
     }
 
     private void AddButton(string buttonText, Action onClick)
@@ -102,5 +124,23 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
             }
         }
         dynamicButtons.Clear();
+    }
+
+    private string GetGroupNameForSkill(Skill skill)
+    {
+        var skillGroups = skillLogicManager.GetSkillGroups();
+        if (skillGroups == null)
+        {
+            Debug.LogError("skillGroups is null in GetGroupNameForSkill!");
+            return string.Empty;
+        }
+
+        foreach (var group in skillGroups)
+        {
+            if (group.skills.Contains(skill))
+                return group.groupName;
+        }
+        Debug.LogWarning($"Skill {skill.skillName} not found in any group!");
+        return string.Empty;
     }
 }

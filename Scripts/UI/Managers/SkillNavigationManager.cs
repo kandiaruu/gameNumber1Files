@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 {
@@ -7,6 +8,7 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
     [SerializeField] private float zoomSpeed = 0.5f;
     [SerializeField] private float minZoom = 0.5f;
     [SerializeField] private float maxZoom = 3f;
+    [SerializeField] private float edgeMoveSpeed = 500f;
 
     private Vector3 dragOrigin;
     public bool isDragging { get; private set; } = false;
@@ -15,15 +17,44 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 
     [InjectAttribute1] private ISkillNotificationHandler notificationHandler { get; set; }
 
+    public string CurrentGroupName { get; private set; } = "Normal";
+
+    private struct PanelStateData
+    {
+        public Vector2 Position;
+        public Vector3 Scale;
+    }
+    private Dictionary<SkillPanelSwitcher.SkillPanelState, PanelStateData> panelStates = new();
+
     private void Awake()
     {
-        skillHolder.anchoredPosition = new Vector2(960f, -455f);
+        DependencyContainer1.InjectDependencies(this);
+
+        panelStates[SkillPanelSwitcher.SkillPanelState.Normal] = new PanelStateData
+        {
+            Position = new Vector2(960f, -455f),
+            Scale = Vector3.one
+        };
+        panelStates[SkillPanelSwitcher.SkillPanelState.Hidden] = new PanelStateData
+        {
+            Position = new Vector2(960f, -455f),
+            Scale = Vector3.one
+        };
+
+        skillHolder.anchoredPosition = panelStates[SkillPanelSwitcher.SkillPanelState.Normal].Position;
+        skillHolder.localScale = panelStates[SkillPanelSwitcher.SkillPanelState.Normal].Scale;
         originalPivot = skillHolder.pivot;
+
     }
 
     private void Update()
     {
-        // Проверяем, находится ли курсор мыши над областью SkillTreeContainer и уведомление не активно
+        if (skillHolder == null || skillTreeContainer == null)
+        {
+            Debug.LogError("skillHolder or skillTreeContainer is null!");
+            return;
+        }
+
         bool isMouseOverContainer = RectTransformUtility.RectangleContainsScreenPoint(skillTreeContainer, Input.mousePosition);
         bool isNotificationActive = notificationHandler != null && notificationHandler.skillNotificationPanelActive;
 
@@ -40,24 +71,23 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
                 isDragging = true;
                 dragStartedInContainer = true;
                 dragOrigin = Input.mousePosition;
-                Debug.Log("Dragging started inside container. isDragging: " + isDragging);
+                Debug.Log("Drag started");
             }
         }
 
-        // Отпускание кнопки в любом месте экрана завершает перетаскивание
+
         if (Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(2))
         {
             isDragging = false;
             dragStartedInContainer = false;
-            Debug.Log("Dragging ended. isDragging: " + isDragging);
+            Debug.Log("Drag ended");
         }
 
-        // Обработка перетаскивания, если оно началось внутри контейнера и уведомление не активно
         if (!isNotificationActive && isDragging && dragStartedInContainer)
         {
             Vector3 delta = Input.mousePosition - dragOrigin;
             dragOrigin = Input.mousePosition;
-            Vector3 newPosition = skillHolder.anchoredPosition + new Vector2(delta.x, delta.y);
+            Vector2 newPosition = skillHolder.anchoredPosition + new Vector2(delta.x, delta.y);
             skillHolder.anchoredPosition = ClampPosition(newPosition);
         }
     }
@@ -70,18 +100,22 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 
         if (Mathf.Approximately(newScale, currentScale)) return;
 
+        // Сохраняем позицию мыши относительно skillHolder до изменения масштаба
         Vector2 mouseScreenPos = Input.mousePosition;
-        Vector2 mouseLocalPosBefore;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(skillHolder, mouseScreenPos, null, out mouseLocalPosBefore);
+        Vector2 localPoint;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(skillHolder, mouseScreenPos, null, out localPoint);
 
-        Vector2 currentPosition = skillHolder.anchoredPosition;
-        Vector2 mouseRelativeToAnchor = mouseLocalPosBefore / currentScale;
+        Vector2 pivotPosition = new Vector2(localPoint.x / skillHolder.rect.width, localPoint.y / skillHolder.rect.height);
 
+        // Изменяем pivot и масштабируем
+        skillHolder.pivot = pivotPosition;
         skillHolder.localScale = new Vector3(newScale, newScale, 1f);
-        Vector2 mouseLocalPosAfter = mouseRelativeToAnchor * newScale;
-        Vector2 positionDelta = mouseLocalPosAfter - mouseLocalPosBefore;
-        Vector2 newPosition = currentPosition - positionDelta;
 
+        // Восстанавливаем начальный pivot для правильного позиционирования
+        skillHolder.pivot = originalPivot;
+
+        // Обновляем позицию skillHolder
+        Vector2 newPosition = skillHolder.anchoredPosition - localPoint * (newScale - currentScale);
         skillHolder.anchoredPosition = ClampPosition(newPosition);
     }
 
@@ -101,12 +135,36 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
         return position;
     }
 
+    public void SavePanelState(SkillPanelSwitcher.SkillPanelState state)
+    {
+        panelStates[state] = new PanelStateData
+        {
+            Position = skillHolder.anchoredPosition,
+            Scale = skillHolder.localScale
+        };
+    }
+
+    public void LoadPanelState(SkillPanelSwitcher.SkillPanelState state)
+    {
+        if (panelStates.ContainsKey(state))
+        {
+            skillHolder.anchoredPosition = panelStates[state].Position;
+            skillHolder.localScale = panelStates[state].Scale;
+        }
+    }
+
+    public void SetCurrentGroup(string groupName)
+    {
+        CurrentGroupName = groupName;
+        Debug.Log($"SkillTreeNavigation: Current group set to {CurrentGroupName}");
+    }
+
     public void ResetNavigation()
     {
-        skillHolder.anchoredPosition = Vector2.zero;
+        skillHolder.anchoredPosition = new Vector2(960f, -455f);
         skillHolder.localScale = Vector3.one;
-        Debug.Log("Navigation reset.");
     }
+
     private void OnDisable()
     {
         isDragging = false;

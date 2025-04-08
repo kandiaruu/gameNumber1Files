@@ -62,24 +62,22 @@ public class Skill
         requiredPrerequisiteCount = prerequisiteIndices != null ? prerequisiteIndices.Length : 0;
     }
 
-    public bool CanUnlock(Skill[] allSkills)
+    public bool CanUnlock(Skill[] groupSkills) // Изменяем параметр на конкретную группу
     {
         if (isUnlocked) return false;
 
-        if (prerequisiteIndices.Length == 0) return true; // Если нет требований, навык можно разблокировать
+        if (prerequisiteIndices.Length == 0) return true;
 
-        // Подсчитываем количество разблокированных обязательных навыков
         int unlockedCount = 0;
         foreach (int index in prerequisiteIndices)
         {
-            Skill prereqSkill = System.Array.Find(allSkills, s => s.skillIndex == index);
+            Skill prereqSkill = System.Array.Find(groupSkills, s => s.skillIndex == index);
             if (prereqSkill != null && prereqSkill.isUnlocked)
             {
                 unlockedCount++;
             }
         }
 
-        // Сравниваем с требуемым количеством
         return unlockedCount >= requiredPrerequisiteCount;
     }
 
@@ -90,9 +88,12 @@ public class Skill
         questionIcon.SetActive(!isUnlocked && !hasQuestionState); // ? показывается, если не куплено и навык не разблокирован
 
         TextMeshProUGUI buttonText = skillButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (isUnlocked) buttonText.text = "Разблокировано";
-        else if (canUnlock && hasQuestionState) buttonText.text = cost.ToString(); // Текст стоимости отображается только после покупки ?
-        else buttonText.text = ""; // Если ? не куплен, текст пустой
+        if (isUnlocked) 
+            buttonText.text = "Разблокировано";
+        else if (canUnlock && hasQuestionState) 
+            buttonText.text = skillName; // Теперь отображается название навыка
+        else 
+            buttonText.text = ""; // Если ? не куплен, текст пустой
     }
 
     public void ShakeLockIcon(MonoBehaviour manager)

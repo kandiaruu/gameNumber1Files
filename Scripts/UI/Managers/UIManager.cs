@@ -188,6 +188,12 @@ public class UIManager : MonoBehaviour, IUIManager
         if (currentPanel != null)
         {
             currentPanel.Close();
+            // Проверяем, является ли закрываемая панель SkillTree
+            var currentConfig = FindPanelConfig(panelConfigs, currentPanel.PanelObject);
+            if (currentConfig != null && currentConfig.panelType == PanelType.SkillTree)
+            {
+                skillTreeNavigation?.ResetNavigation(); // Сбрасываем позицию и масштаб skillHolder
+            }
             currentPanel = null;
             SetGamePaused(false);
             UpdateSkillComponentsState();
@@ -202,6 +208,10 @@ public class UIManager : MonoBehaviour, IUIManager
             HidePanelRecursive(config);
         }
         currentPanel = null;
+        if (skillTreeNavigation != null)
+        {
+            skillTreeNavigation.ResetNavigation(); // Сбрасываем при скрытии всех панелей
+        }
         UpdateSkillComponentsState();
         UpdateScriptStates(null);
     }
@@ -225,7 +235,17 @@ public class UIManager : MonoBehaviour, IUIManager
     private void SetGamePaused(bool paused)
     {
         Time.timeScale = paused ? 0 : 1;
-        Cursor.visible = paused;
+
+        if (paused)
+        {
+            Cursor.lockState = CursorLockMode.None; // Разблокируем курсор
+            Cursor.visible = true;                  // Показываем курсор
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.Locked; // Замораживаем курсор по центру
+            Cursor.visible = false;                   // Прячем курсор
+        }
     }
 
     public void ActivatePanel(PanelType panelType)
