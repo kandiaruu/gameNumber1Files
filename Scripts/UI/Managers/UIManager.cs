@@ -8,7 +8,8 @@ public class UIManager : MonoBehaviour, IUIManager
         Inventory,
         SkillTree,
         Notification,
-        Tooltip
+        Tooltip,
+        Selection
     }
 
     [System.Serializable]
@@ -18,7 +19,9 @@ public class UIManager : MonoBehaviour, IUIManager
         public GameObject panelObject;
         public MonoBehaviour[] scriptsToDisable;
         public List<PanelConfig> childPanels = new List<PanelConfig>();
-        
+        public bool showTooltip = false; // По умолчанию тултип включён
+        public bool allowNavigation = false; // Новое поле для управления зумом и перетаскиванием
+        public bool allowSkillButtonInteraction = false; // Новое поле для управления кнопками
     }
 
     [System.Serializable]
@@ -362,6 +365,24 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    public bool ShouldAllowSkillButtonInteraction()
+    {
+        var activePanelConfig = FindActivePanelConfig();
+        if (activePanelConfig != null)
+        {
+            if (!activePanelConfig.allowSkillButtonInteraction)
+            {
+                Debug.Log($"Взаимодействие с кнопками навыков отключено для панели {activePanelConfig.panelType}");
+                return false;
+            }
+        }
+        else
+        {
+            Debug.Log("Активная панель не найдена, разрешаем взаимодействие с кнопками по умолчанию");
+        }
+        return true; // Если нет активной панели или взаимодействие разрешено
+    }
+
     private PanelConfig FindPanelConfig(List<PanelConfig> configs, GameObject panelObject)
     {
         foreach (var config in configs)
@@ -412,5 +433,67 @@ public class UIManager : MonoBehaviour, IUIManager
             }
         }
         return null;
+    }
+
+    public PanelConfig FindActivePanelConfig()
+    {
+        PanelConfig deepestActiveConfig = null;
+        FindActivePanelConfigRecursive(panelConfigs, ref deepestActiveConfig, 0);
+        return deepestActiveConfig;
+    }
+    public bool ShouldAllowNavigation()
+        {
+            var activePanelConfig = FindActivePanelConfig();
+            if (activePanelConfig != null)
+            {
+                if (!activePanelConfig.allowNavigation)
+                {
+                    Debug.Log($"Навигация отключена для панели {activePanelConfig.panelType}");
+                    return false;
+                }
+            }
+            return true; // Если нет активной панели или навигация разрешена
+        }
+
+    private void FindActivePanelConfigRecursive(List<PanelConfig> configs, ref PanelConfig deepestActiveConfig, int currentDepth)
+    {
+        foreach (var config in configs)
+        {
+            // Проверяем, активна ли текущая панель
+            if (config.panelObject != null && config.panelObject.activeSelf)
+            {
+                // Если это самая глубокая активная панель на данный момент, обновляем
+                if (deepestActiveConfig == null || currentDepth > GetDepth(panelConfigs, deepestActiveConfig))
+                {
+                    deepestActiveConfig = config;
+                }
+            }
+
+            // Рекурсивно проверяем дочерние панели
+            FindActivePanelConfigRecursive(config.childPanels, ref deepestActiveConfig, currentDepth + 1);
+        }
+    }
+
+    // Вспомогательный метод для определения глубины панели в иерархии
+    private int GetDepth(List<PanelConfig> configs, PanelConfig targetConfig)
+    {
+        return GetDepthRecursive(configs, targetConfig, 0);
+    }
+
+    private int GetDepthRecursive(List<PanelConfig> configs, PanelConfig targetConfig, int currentDepth)
+    {
+        foreach (var config in configs)
+        {
+            if (config == targetConfig)
+            {
+                return currentDepth;
+            }
+            int childDepth = GetDepthRecursive(config.childPanels, targetConfig, currentDepth + 1);
+            if (childDepth != -1)
+            {
+                return childDepth;
+            }
+        }
+        return -1; // Не нашли
     }
 }

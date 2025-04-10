@@ -8,11 +8,14 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
     [InjectAttribute1] private ISkillNotificationHandler notificationHandler { get; set; }
     [InjectAttribute1] private ITooltipManager tooltipManager { get; set; }
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
+    [InjectAttribute1] private ISkillPanelManager skillPanelManager { get; set; }
+    [InjectAttribute1] private IUIManager uiManager { get; set; }
     private Skill lastHoveredSkill;
     private bool wasDraggingLastFrame = false;
     private bool isMousePressed;
     private float pressStartTime;
     private float clickThreshold = 0.2f;
+    private GameObject panelSelection;
 
     private void Start()
     {
@@ -92,13 +95,32 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 
     public void OnPointerEnter(Skill skill)
     {
-        string currentGroup = skillTreeNavigation?.CurrentGroupName;
-        if (string.IsNullOrEmpty(currentGroup) || !IsSkillInCurrentGroup(skill, currentGroup))
+        panelSelection = uiManager.GetPanel(UIManager.PanelType.Selection); 
+        string currentGroup = skillPanelManager?.GetCurrentPanelName();
+        if (string.IsNullOrEmpty(currentGroup))
         {
+            Debug.LogWarning("Текущая группа не установлена в SkillTreeNavigation!");
             return;
         }
 
-        if (!skill.questionIcon.activeSelf && !skillTreeNavigation.isDragging && !notificationHandler.skillNotificationPanelActive)
+        if (skill.groupName != currentGroup)
+        {
+            Debug.Log($"Skill {skill.skillName} не принадлежит текущей группе {currentGroup}. Игнорируем наведение.");
+            return;
+        }
+
+        // Проверяем, разрешён ли тултип для активной панели (включая дочерние)
+        var activePanelConfig = uiManager.FindActivePanelConfig();
+        if (activePanelConfig != null && !activePanelConfig.showTooltip)
+        {
+            Debug.Log($"Тултип отключён для панели {activePanelConfig.panelType}");
+            return;
+        }
+        else {
+            Debug.Log($"Тултип включён для панели {activePanelConfig?.panelType}");
+        }
+
+        if (!skill.questionIcon.activeSelf && !skillTreeNavigation.isDragging)
         {
             tooltipManager.ShowTooltip(skill, Input.mousePosition);
             lastHoveredSkill = skill;
@@ -129,24 +151,5 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
                 break;
             }
         }
-    }
-
-    private bool IsSkillInCurrentGroup(Skill skill, string currentGroup)
-    {
-        var skillGroups = skillTreeManager.GetSkillGroups();
-        if (skillGroups == null)
-        {
-            Debug.LogError("skillGroups is null in IsSkillInCurrentGroup!");
-            return false;
-        }
-
-        var group = skillGroups.FirstOrDefault(g => g.groupName == currentGroup);
-        if (group == null)
-        {
-            Debug.LogWarning($"Group {currentGroup} not found!");
-            return false;
-        }
-
-        return group.skills.Contains(skill);
     }
 }

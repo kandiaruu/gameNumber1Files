@@ -10,8 +10,9 @@ public class Skill
     public int cost;
     public bool isUnlocked;
     public int[] prerequisiteIndices;
+    public bool isVisible = false; // Флаг видимости навыка
 
-    [SerializeField] public int requiredPrerequisiteCount; // Сколько требований нужно выполнить
+    [SerializeField] public int requiredPrerequisiteCount;
 
     public Button skillButton;
     public GameObject lockIcon;
@@ -22,16 +23,18 @@ public class Skill
     [System.NonSerialized] private Image lockImage;
     [System.NonSerialized] private Color originalColor;
 
-    public GameObject questionIcon; // Объект для знака ?
-    [System.NonSerialized] public bool hasQuestionState = false; // Флаг состояния ?
-    [SerializeField] public bool hasQuestionByDefault = true; // Флаг по умолчанию для ?
-    public int questionGoldCost = 5; // Индивидуальная стоимость золота для покупки ?
+    public GameObject questionIcon;
+    [System.NonSerialized] public bool hasQuestionState = false;
+    [SerializeField] public bool hasQuestionByDefault = true;
+    public int questionGoldCost = 5;
 
     [TextArea] public string description;
     public string[] characteristics;
     public int maxUpgrades;
 
-    // Метод для инициализации
+    // Новое поле для хранения имени группы
+    [System.NonSerialized] public string groupName;
+
     public void Initialize()
     {
         if (skillButton == null)
@@ -45,24 +48,21 @@ public class Skill
             return;
         }
 
-        // Инициализируем lockIconTransform
         lockIconTransform = lockIcon.GetComponent<RectTransform>();
         if (lockIconTransform != null)
         {
             originalPosition = lockIconTransform.anchoredPosition;
         }
 
-        // Устанавливаем hasQuestionState на основе hasQuestionByDefault
         hasQuestionState = !hasQuestionByDefault;
     }
 
-    // Конструктор для установки начального значения requiredPrerequisiteCount
     public Skill()
     {
         requiredPrerequisiteCount = prerequisiteIndices != null ? prerequisiteIndices.Length : 0;
     }
 
-    public bool CanUnlock(Skill[] groupSkills) // Изменяем параметр на конкретную группу
+    public bool CanUnlock(Skill[] groupSkills)
     {
         if (isUnlocked) return false;
 
@@ -84,16 +84,18 @@ public class Skill
     public void UpdateUI(bool canAfford, Skill[] allSkills)
     {
         bool canUnlock = CanUnlock(allSkills);
-        lockIcon.SetActive(!isUnlocked && hasQuestionState && !canUnlock); // Замок появляется только после ? и если условия не выполнены
-        questionIcon.SetActive(!isUnlocked && !hasQuestionState); // ? показывается, если не куплено и навык не разблокирован
+        lockIcon.SetActive(!isUnlocked && hasQuestionState && !canUnlock);
+        questionIcon.SetActive(!isUnlocked && !hasQuestionState);
 
         TextMeshProUGUI buttonText = skillButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (isUnlocked) 
+        if (isUnlocked)
             buttonText.text = "Разблокировано";
-        else if (canUnlock && hasQuestionState) 
-            buttonText.text = skillName; // Теперь отображается название навыка
-        else 
-            buttonText.text = ""; // Если ? не куплен, текст пустой
+        else if (canUnlock && hasQuestionState)
+            buttonText.text = skillName;
+        else
+            buttonText.text = "";
+
+        skillButton.gameObject.SetActive(isVisible); // Устанавливаем видимость на основе флага
     }
 
     public void ShakeLockIcon(MonoBehaviour manager)
@@ -131,5 +133,19 @@ public class Skill
         lockIconTransform.anchoredPosition = originalPosition;
         if (lockImage != null) lockImage.color = originalColor;
         isShaking = false;
+    }
+
+    public void HandleVisibilityChange(bool newVisibility, Skill[] groupSkills)
+    {
+        if (!isVisible && newVisibility)
+        {
+            if (CanUnlock(groupSkills))
+            {
+                isUnlocked = true;
+            }
+        }
+        isVisible = newVisibility;
+        // Обновляем UI при изменении видимости
+        UpdateUI(true, groupSkills);
     }
 }

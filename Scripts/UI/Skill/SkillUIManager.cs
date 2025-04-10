@@ -11,8 +11,11 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
     [SerializeField] private Button skillsResetButton;
     [SerializeField] private Button resetQuestionsButton;
     [InjectAttribute1] private ISkillTreeManager SkillLogicManager { get; set; }
-    [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; } // Добавляем доступ к текущей группе
+    [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
+    [InjectAttribute1] private ISkillPanelManager skillPanelManager { get; set; }
+    [InjectAttribute1] private IUIManager uiManager { get; set; }
     private Dictionary<string, ColorBlock[]> originalColorBlocks;
+    private bool lastButtonState = true; // Для отслеживания изменений состояния
 
     void Awake()
     {
@@ -23,24 +26,19 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
 
     void Start()
     {
-        if (SkillLogicManager == null)
-        {
-            throw new System.NullReferenceException("SkillLogicManager is not injected!");
-        }
-        if (skillTreeNavigation == null)
-        {
-            throw new System.NullReferenceException("SkillTreeNavigation is not injected!");
-        }
+        if (SkillLogicManager == null) throw new System.NullReferenceException("SkillLogicManager is not injected!");
+        if (skillTreeNavigation == null) throw new System.NullReferenceException("SkillTreeNavigation is not injected!");
+        if (skillPanelManager == null) throw new System.NullReferenceException("SkillPanelManager is not injected!");
 
         skillsResetButton.onClick.AddListener(() => 
         {
             string currentGroup = skillTreeNavigation.CurrentGroupName;
-            SkillLogicManager.ResetSkills(currentGroup); // Сбрасываем только текущую группу
+            SkillLogicManager.ResetSkills();
         });
         resetQuestionsButton.onClick.AddListener(() => 
         {
             string currentGroup = skillTreeNavigation.CurrentGroupName;
-            SkillLogicManager.ResetQuestionsAndGold(currentGroup); // Сбрасываем только текущую группу
+            SkillLogicManager.ResetQuestionsAndGold();
         });
 
         SkillLogicManager.OnSkillPointsChanged += points => skillPointsText.text = $"Очки навыков: {points}";
@@ -48,6 +46,20 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         SkillLogicManager.OnSkillsUpdated += RefreshAllSkills;
 
         DisableButtonColorChange();
+        UpdateButtonState(); // Проверка состояния при старте
+    }
+
+    void Update()
+    {
+        // Проверяем, разрешено ли взаимодействие с кнопками
+        bool allowInteraction = uiManager.ShouldAllowSkillButtonInteraction();
+
+        // Обновляем состояние кнопок только если оно изменилось
+        if (allowInteraction != lastButtonState)
+        {
+            EnableSkillButtons(allowInteraction);
+            lastButtonState = allowInteraction;
+        }
     }
 
     private void ValidateUIElements()
@@ -110,6 +122,13 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
                 skill.skillButton.colors = colors;
             }
         }
+    }
+
+    private void UpdateButtonState()
+    {
+        bool allowInteraction = uiManager.ShouldAllowSkillButtonInteraction();
+        EnableSkillButtons(allowInteraction);
+        lastButtonState = allowInteraction;
     }
 
     public void RefreshAllSkills()

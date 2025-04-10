@@ -7,6 +7,8 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
     [SerializeField] private int skillPoints = 3;
     [SerializeField] private int gold = 10;
     [InjectAttribute1] private ISkillUIManager SkillUIManager { get; set; }
+    [InjectAttribute1] private ISkillPanelManager SkillPanelManager { get; set; } // Новая зависимость
+    [InjectAttribute1] private ISkillPanelUI skillPanelUI { get; set; } // Новая зависимость
 
     public event System.Action<int> OnSkillPointsChanged;
     public event System.Action<int> OnGoldChanged;
@@ -25,10 +27,19 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         {
             foreach (var skill in group.skills)
             {
+                skill.groupName = group.groupName; // Заполняем поле groupName
                 skill.Initialize();
             }
         }
         SkillUIManager?.RefreshAllSkills();
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Alpha0))
+        {
+            SetSkillsVisibility("Hidden", 0, true);
+        }
     }
 
     public void UnlockSkill(string groupName, int skillIndex)
@@ -67,12 +78,19 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         OnSkillsUpdated?.Invoke();
     }
 
-    public void ResetSkills(string groupName)
+    public void ResetSkills()
     {
-        SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
+        string currentGroupName = SkillPanelManager?.GetCurrentPanelName() ?? "Normal"; // Получаем текущую группу
+        if (currentGroupName == "Hidden")
+        {
+            Debug.Log("Сброс навыков для группы 'Hidden' не разрешен!");
+            return;
+        }
+
+        SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == currentGroupName);
         if (group == null)
         {
-            Debug.LogWarning($"Группа {groupName} не найдена для сброса навыков!");
+            Debug.LogWarning($"Группа {currentGroupName} не найдена для сброса навыков!");
             return;
         }
 
@@ -86,12 +104,13 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         OnSkillsUpdated?.Invoke();
     }
 
-    public void ResetQuestionsAndGold(string groupName)
+    public void ResetQuestionsAndGold()
     {
-        SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
+        string currentGroupName = SkillPanelManager?.GetCurrentPanelName() ?? "Normal"; // Получаем текущую группу
+        SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == currentGroupName);
         if (group == null)
         {
-            Debug.LogWarning($"Группа {groupName} не найдена для сброса вопросов!");
+            Debug.LogWarning($"Группа {currentGroupName} не найдена для сброса вопросов!");
             return;
         }
 
@@ -105,44 +124,6 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
                     goldToReturn += skill.questionGoldCost;
                 }
                 skill.hasQuestionState = !skill.hasQuestionByDefault;
-            }
-        }
-        gold += goldToReturn;
-        OnGoldChanged?.Invoke(gold);
-        OnSkillsUpdated?.Invoke();
-    }
-
-    public void ResetSkills() // Оставляем для совместимости, но теперь он не используется напрямую
-    {
-        int pointsToReturn = 0;
-        foreach (var group in skillGroups)
-        {
-            pointsToReturn += group.skills.Where(s => s.isUnlocked).Sum(s => s.cost);
-            foreach (var skill in group.skills)
-            {
-                skill.isUnlocked = false;
-            }
-        }
-        skillPoints += pointsToReturn;
-        OnSkillPointsChanged?.Invoke(skillPoints);
-        OnSkillsUpdated?.Invoke();
-    }
-
-    public void ResetQuestionsAndGold() // Оставляем для совместимости
-    {
-        int goldToReturn = 0;
-        foreach (var group in skillGroups)
-        {
-            foreach (var skill in group.skills)
-            {
-                if (!skill.isUnlocked && skill.hasQuestionState)
-                {
-                    if (skill.hasQuestionByDefault)
-                    {
-                        goldToReturn += skill.questionGoldCost;
-                    }
-                    skill.hasQuestionState = !skill.hasQuestionByDefault;
-                }
             }
         }
         gold += goldToReturn;
@@ -164,4 +145,32 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
     public SkillGroup[] GetSkillGroups() => skillGroups;
     public void EnableSkillButtons(bool enable) { }
     public void OnNotificationPanelClosed() { }
+
+    public void SetSkillVisibility(string groupName, int skillIndex, bool isVisible)
+    {
+        SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
+        if (group == null) return;
+
+        Skill skill = group.skills.FirstOrDefault(s => s.skillIndex == skillIndex);
+        if (skill == null) return;
+
+        skill.HandleVisibilityChange(isVisible, GetAllSkillsInGroup(groupName));
+        OnSkillsUpdated?.Invoke();
+    }
+
+    public void SetSkillsVisibility(string groupName, int skillIndex, bool isVisible)
+    {
+        SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
+        if (group == null) return;
+
+        foreach (var skill in group.skills)
+        {
+            if (skill.skillIndex == skillIndex)
+            {
+                skill.HandleVisibilityChange(isVisible, GetAllSkillsInGroup(groupName));
+            }
+        }
+        skillPanelUI?.UnlockPanel(groupName); // Обновляем UI после изменения видимости
+        OnSkillsUpdated?.Invoke();
+    }
 }

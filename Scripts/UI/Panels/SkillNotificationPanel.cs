@@ -87,17 +87,11 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
             });
             AddButton("Отмена", Close);
         }
-
-        skillUIManager?.EnableSkillButtons(false);
     }
 
     protected override void OnClose()
     {
         ClearButtons();
-        if (skillUIManager != null)
-        {
-            skillUIManager.EnableSkillButtons(true);
-        }
         currentSkill = null;
         // Не обнуляем skillLogicManager, если он инжектируется
     }

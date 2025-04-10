@@ -35,8 +35,13 @@ public class GameBootstrap : MonoBehaviour
 
     [Dependency(new[] { typeof(ISkillTooltipPanel) }, typeof(SkillTooltipPanel), Lifecycle.Singleton)]
     [SerializeField] private SkillTooltipPanel skillTooltipPanel;
-    [Dependency(new[] { typeof(ISkillPanelSwitcher) }, typeof(SkillPanelSwitcher), Lifecycle.Singleton, typeof(ISkillTreeNavigation))]
-    [SerializeField] private SkillPanelSwitcher skillPanelSwitcher;
+    [Dependency(new[] { typeof(ISkillPanelManager) }, typeof(SkillPanelManager), Lifecycle.Singleton, typeof(ISkillTreeNavigation), typeof(ISkillPanelUI))] // Added ISkillPanelUI dependency
+    [SerializeField] private SkillPanelManager skillPanelManager;
+
+    [Dependency(new[] { typeof(ISkillPanelUI) }, typeof(SkillPanelUI), Lifecycle.Singleton, typeof(ISkillPanelManager), typeof(IUIManager))] // Added IUIManager dependency
+    [SerializeField] private SkillPanelUI skillPanelUI;
+    [Dependency(new[] { typeof(ISkillTree) }, typeof(SkillTree), Lifecycle.Singleton, typeof(ISkillPanelManager))]
+    [SerializeField] private SkillTree skillTree;
 
     private static FieldInfo[] _dependencyFields;
     private static FieldInfo[] _allFields;

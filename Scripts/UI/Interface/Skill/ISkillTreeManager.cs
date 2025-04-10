@@ -4,8 +4,6 @@ public interface ISkillTreeManager
     void BuyQuestionState(string groupName, int skillIndex);
     void ResetSkills(); // Старая версия
     void ResetQuestionsAndGold(); // Старая версия
-    void ResetSkills(string groupName); // Новая версия
-    void ResetQuestionsAndGold(string groupName); // Новая версия
     void AddSkillPoints(int points);
     int GetSkillPoints();
     Skill[] GetAllSkills();
@@ -17,4 +15,5 @@ public interface ISkillTreeManager
     event System.Action<int> OnSkillPointsChanged;
     event System.Action<int> OnGoldChanged;
     event System.Action OnSkillsUpdated;
+    void SetSkillVisibility(string groupName, int skillIndex, bool isVisible);
 }

@@ -10,8 +10,8 @@ public class ButtonAlphaManager : MonoBehaviour
 
     void Awake()
     {
-        // Кэшируем все Image на сцене без сортировки
-        cachedImages = Object.FindObjectsByType<Image>(FindObjectsSortMode.None);
+        // Кэшируем все Image, включая неактивные объекты
+        cachedImages = Resources.FindObjectsOfTypeAll<Image>();
     }
 
     void Start()
@@ -19,9 +19,20 @@ public class ButtonAlphaManager : MonoBehaviour
         // Применяем порог только к кнопкам без исключительного тега
         foreach (Image image in cachedImages)
         {
-            if (image != null && image.GetComponent<Button>() != null && image.gameObject.tag != exclusionTag)
+            // Проверяем, что image не null и принадлежит сцене
+            if (image == null || !image.gameObject.scene.IsValid())
+                continue;
+
+            if (image.GetComponent<Button>() != null && image.gameObject.tag != exclusionTag)
             {
-                image.alphaHitTestMinimumThreshold = alphaThreshold;
+                try
+                {
+                    image.alphaHitTestMinimumThreshold = alphaThreshold;
+                }
+                catch (System.Exception)
+                {
+                    
+                }
             }
         }
     }
