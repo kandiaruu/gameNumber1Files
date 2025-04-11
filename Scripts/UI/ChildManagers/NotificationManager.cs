@@ -44,6 +44,18 @@ public class NotificationManager : MonoBehaviour, INotificationManager
         }
     }
 
+        public void ShowNotification(Skill skill, int dependentCount, System.Action onConfirm)
+    {
+        if (notificationPanel != null)
+        {
+            notificationPanel.ShowResetConfirmation(skill, dependentCount, onConfirm);
+        }
+        else
+        {
+            Debug.LogWarning("NotificationPanel не инициализирован!");
+        }
+    }
+
     public bool IsNotificationActive()
     {
         return notificationPanel != null && notificationPanel.IsOpen;

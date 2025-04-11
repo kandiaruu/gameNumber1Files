@@ -8,7 +8,6 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
     [SerializeField] private float zoomSpeed = 0.5f;
     [SerializeField] private float minZoom = 0.5f;
     [SerializeField] private float maxZoom = 3f;
-    [SerializeField] private float edgeMoveSpeed = 500f;
 
     private Vector3 dragOrigin;
     public bool isDragging { get; private set; } = false;
@@ -16,10 +15,6 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
     private bool dragStartedInContainer = false;
 
     [InjectAttribute1] private IUIManager uiManager { get; set; }
-
-    [InjectAttribute1] private ISkillNotificationHandler notificationHandler { get; set; }
-
-    public string CurrentGroupName { get; private set; } = "Normal";
 
     private struct PanelStateData
     {
@@ -30,21 +25,6 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 
     private void Awake()
     {
-        // DependencyContainer1.InjectDependencies(this);
-
-        // panelStates[SkillPanelManager.SkillPanelState.Normal] = new PanelStateData
-        // {
-        //     Position = new Vector2(960f, -455f),
-        //     Scale = Vector3.one
-        // };
-        // panelStates[SkillPanelManager.SkillPanelState.Hidden] = new PanelStateData
-        // {
-        //     Position = new Vector2(960f, -455f),
-        //     Scale = Vector3.one
-        // };
-
-        // skillHolder.anchoredPosition = panelStates[SkillPanelManager.SkillPanelState.Normal].Position;
-        // skillHolder.localScale = panelStates[SkillPanelManager.SkillPanelState.Normal].Scale;
         originalPivot = skillHolder.pivot;
     }
 
@@ -131,22 +111,6 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
         position.x = Mathf.Clamp(position.x, minX, maxX);
         position.y = Mathf.Clamp(position.y, minY, maxY);
         return position;
-    }
-
-    public void LoadPanelState(SkillPanelManager.SkillPanelState state)
-    {
-        if (panelStates.ContainsKey(state))
-        {
-            skillHolder.anchoredPosition = panelStates[state].Position;
-            skillHolder.localScale = panelStates[state].Scale;
-        }
-    }
-
-    public void SetCurrentGroup(string groupName)
-    {
-        CurrentGroupName = groupName;
-        Debug.Log($"SkillTreeNavigation: Current group set to {CurrentGroupName}");
-        LoadPanelState((SkillPanelManager.SkillPanelState)System.Enum.Parse(typeof(SkillPanelManager.SkillPanelState), groupName));
     }
 
     public void ResetNavigation()

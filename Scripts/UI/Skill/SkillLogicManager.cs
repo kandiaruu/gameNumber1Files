@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Linq;
+using System.Collections.Generic;
 
 public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
 {
@@ -9,6 +10,7 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
     [InjectAttribute1] private ISkillUIManager SkillUIManager { get; set; }
     [InjectAttribute1] private ISkillPanelManager SkillPanelManager { get; set; } // Новая зависимость
     [InjectAttribute1] private ISkillPanelUI skillPanelUI { get; set; } // Новая зависимость
+    [InjectAttribute1] private INotificationManager notificationManager { get; set; }
 
     public event System.Action<int> OnSkillPointsChanged;
     public event System.Action<int> OnGoldChanged;
@@ -81,11 +83,6 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
     public void ResetSkills()
     {
         string currentGroupName = SkillPanelManager?.GetCurrentPanelName() ?? "Normal"; // Получаем текущую группу
-        if (currentGroupName == "Hidden")
-        {
-            Debug.Log("Сброс навыков для группы 'Hidden' не разрешен!");
-            return;
-        }
 
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == currentGroupName);
         if (group == null)
@@ -94,14 +91,27 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             return;
         }
 
-        int pointsToReturn = group.skills.Where(s => s.isUnlocked).Sum(s => s.cost);
+        // Считаем очки только для навыков, которые можно сбросить
+        int pointsToReturn = group.skills
+            .Where(s => s.isUnlocked && s.canBeReset)
+            .Sum(s => s.cost);
+
+        // Сбрасываем только те навыки, у которых canBeReset = true
         foreach (var skill in group.skills)
         {
-            skill.isUnlocked = false;
+            if (skill.isUnlocked && skill.canBeReset)
+            {
+                skill.isUnlocked = false;
+                skill.UpdateUI(true, GetAllSkillsInGroup(currentGroupName)); // Обновляем UI
+            }
         }
+
+        // Возвращаем очки навыков
         skillPoints += pointsToReturn;
         OnSkillPointsChanged?.Invoke(skillPoints);
         OnSkillsUpdated?.Invoke();
+
+        Debug.Log($"Сброшено навыков: {group.skills.Count(s => s.isUnlocked == false && s.canBeReset)}. Возвращено {pointsToReturn} очков.");
     }
 
     public void ResetQuestionsAndGold()
@@ -172,5 +182,81 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         }
         skillPanelUI?.UnlockPanel(groupName); // Обновляем UI после изменения видимости
         OnSkillsUpdated?.Invoke();
+    }
+
+    public void ResetSkill(string groupName, int skillIndex)
+    {
+        SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
+        if (group == null)
+        {
+            Debug.LogWarning($"Группа {groupName} не найдена!");
+            return;
+        }
+
+        Skill skillToReset = group.skills.FirstOrDefault(s => s.skillIndex == skillIndex);
+        if (skillToReset == null || !skillToReset.isUnlocked)
+        {
+            Debug.LogWarning($"Навык с индексом {skillIndex} в группе {groupName} не найден или уже сброшен!");
+            return;
+        }
+
+        if (!skillToReset.canBeReset)
+        {
+            Debug.LogWarning($"Навык {skillToReset.skillName} нельзя сбросить!");
+            return;
+        }
+
+        // Проверяем зависимые навыки
+        List<Skill> dependentSkills = new List<Skill>();
+        int totalPointsToReturn = skillToReset.cost;
+        FindDependentSkills(group, skillToReset, dependentSkills, ref totalPointsToReturn);
+
+        if (dependentSkills.Count > 0)
+        {
+            // Показываем уведомление, если есть зависимости
+            notificationManager?.ShowNotification(skillToReset, dependentSkills.Count, () =>
+            {
+                // Callback для сброса
+                dependentSkills.Add(skillToReset); // Добавляем сам навык в список
+                foreach (var skill in dependentSkills)
+                {
+                    skill.isUnlocked = false;
+                    skill.UpdateUI(true, GetAllSkillsInGroup(groupName));
+                }
+                skillPoints += totalPointsToReturn;
+                OnSkillPointsChanged?.Invoke(skillPoints);
+                OnSkillsUpdated?.Invoke();
+                Debug.Log($"Сброшены навыки: {string.Join(", ", dependentSkills.Select(s => s.skillName))}. Возвращено {totalPointsToReturn} очков.");
+            });
+        }
+        else
+        {
+
+            // Сбрасываем сразу, если нет зависимостей
+            skillToReset.isUnlocked = false;
+            skillToReset.UpdateUI(true, GetAllSkillsInGroup(groupName));
+            skillPoints += skillToReset.cost;
+            OnSkillPointsChanged?.Invoke(skillPoints);
+            OnSkillsUpdated?.Invoke();
+            Debug.Log($"Сброшен навык: {skillToReset.skillName}. Возвращено {skillToReset.cost} очков.");
+        }
+    }
+
+    // Вспомогательный метод для поиска зависимых навыков
+    private void FindDependentSkills(SkillGroup group, Skill skillToReset, List<Skill> skillsToReset, ref int totalPointsToReturn)
+    {
+        foreach (var skill in group.skills)
+        {
+            if (!skill.isUnlocked || skillsToReset.Contains(skill)) continue;
+
+            // Проверяем, зависит ли этот навык от skillToReset
+            if (skill.prerequisiteIndices.Contains(skillToReset.skillIndex))
+            {
+                skillsToReset.Add(skill);
+                totalPointsToReturn += skill.cost;
+                // Рекурсивно проверяем зависимости этого навыка
+                FindDependentSkills(group, skill, skillsToReset, ref totalPointsToReturn);
+            }
+        }
     }
 }

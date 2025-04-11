@@ -32,12 +32,10 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
 
         skillsResetButton.onClick.AddListener(() => 
         {
-            string currentGroup = skillTreeNavigation.CurrentGroupName;
             SkillLogicManager.ResetSkills();
         });
         resetQuestionsButton.onClick.AddListener(() => 
         {
-            string currentGroup = skillTreeNavigation.CurrentGroupName;
             SkillLogicManager.ResetQuestionsAndGold();
         });
 

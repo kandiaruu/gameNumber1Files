@@ -9,7 +9,8 @@ public class UIManager : MonoBehaviour, IUIManager
         SkillTree,
         Notification,
         Tooltip,
-        Selection
+        Selection,
+        SkillGui
     }
 
     [System.Serializable]

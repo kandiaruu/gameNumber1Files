@@ -11,7 +11,7 @@ public class Skill
     public bool isUnlocked;
     public int[] prerequisiteIndices;
     public bool isVisible = false; // Флаг видимости навыка
-
+    public bool canBeReset = true;
     [SerializeField] public int requiredPrerequisiteCount;
 
     public Button skillButton;

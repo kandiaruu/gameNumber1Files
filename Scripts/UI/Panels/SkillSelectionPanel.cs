@@ -24,10 +24,6 @@ public class SkillPanelUI : BasePanel, ISkillPanelUI
         {
             Debug.LogError("Selection panel not found in UIManager!");
         }
-        else
-        {
-            Debug.Log("Selection panel found in UIManager!");
-        }
 
         SetupSkillsButton();
         CreatePanelButtons();

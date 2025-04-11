@@ -10,9 +10,9 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
     [InjectAttribute1] private ISkillPanelManager skillPanelManager { get; set; }
     [InjectAttribute1] private IUIManager uiManager { get; set; }
+    [InjectAttribute1] private ISkillGuiManager skillGuiManager { get; set; }
     private Skill lastHoveredSkill;
     private bool wasDraggingLastFrame = false;
-    private bool isMousePressed;
     private float pressStartTime;
     private float clickThreshold = 0.2f;
     private GameObject panelSelection;
@@ -27,18 +27,14 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
     {
         if (Input.GetMouseButtonDown(0))
         {
-            isMousePressed = true;
             pressStartTime = Time.unscaledTime;
-        }
-        if (Input.GetMouseButtonUp(0))
-        {
-            isMousePressed = false;
         }
 
         if (skillTreeNavigation != null && !notificationHandler.skillNotificationPanelActive)
         {
             if (skillTreeNavigation.isDragging)
             {
+                Debug.Log("Dragging detected, hiding tooltip.");
                 tooltipManager.HideTooltip();
             }
             else if (wasDraggingLastFrame && !skillTreeNavigation.isDragging)
@@ -69,17 +65,25 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
                 var trigger = skill.skillButton.gameObject.GetComponent<EventTrigger>() ?? skill.skillButton.gameObject.AddComponent<EventTrigger>();
                 AddEventTrigger(trigger, EventTriggerType.PointerEnter, () => OnPointerEnter(skill));
                 AddEventTrigger(trigger, EventTriggerType.PointerExit, OnPointerExit);
-                
+
+                skill.skillButton.onClick.RemoveAllListeners(); // Очищаем старые слушатели
                 skill.skillButton.onClick.AddListener(() =>
                 {
                     float pressDuration = Time.unscaledTime - pressStartTime;
-                    if (pressDuration <= clickThreshold && !skill.isUnlocked && notificationHandler != null)
+                    if (pressDuration <= clickThreshold) // Проверяем, что это клик, а не удержание
                     {
-                        notificationHandler.ShowNotification(skill);
-                    }
-                    else if (notificationHandler == null)
-                    {
-                        Debug.LogError("NotificationHandler is null when clicking skill!");
+                        if (skill.isUnlocked && skillGuiManager != null)
+                        {
+                            skillGuiManager.ShowSkillGui(skill); // Показываем SkillGui для разблокированного навыка
+                        }
+                        else if (!skill.isUnlocked && notificationHandler != null)
+                        {
+                            notificationHandler.ShowNotification(skill); // Существующая логика для заблокированных навыков
+                        }
+                        else if (notificationHandler == null)
+                        {
+                            Debug.LogError("NotificationHandler is null when clicking skill!");
+                        }
                     }
                 });
             }
@@ -134,7 +138,7 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 
     private void CheckHoverAfterDrag()
     {
-        string currentGroup = skillTreeNavigation?.CurrentGroupName;
+        string currentGroup = skillPanelManager?.GetCurrentPanelName();;
         if (string.IsNullOrEmpty(currentGroup))
         {
             Debug.LogWarning("Current group is not set in SkillTreeNavigation!");

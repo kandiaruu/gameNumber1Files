@@ -12,7 +12,7 @@ public class GameBootstrap : MonoBehaviour
     [Dependency(new[] { typeof(ISkillUIManager) }, typeof(SkillUIManager), Lifecycle.Singleton, typeof(ISkillTreeManager))]
     [SerializeField] private SkillUIManager skillUIManager;
 
-    [Dependency(new[] { typeof(ISkillInputHandler) }, typeof(SkillInputHandler), Lifecycle.Singleton, typeof(ISkillTreeManager), typeof(ISkillNotificationHandler), typeof(ITooltipManager), typeof(ISkillTreeNavigation))]
+    [Dependency(new[] { typeof(ISkillInputHandler) }, typeof(SkillInputHandler), Lifecycle.Singleton, typeof(ISkillTreeManager), typeof(ISkillNotificationHandler), typeof(ITooltipManager), typeof(ISkillTreeNavigation), typeof(ISkillGuiManager))]
     [SerializeField] private SkillInputHandler skillInputHandler;
 
     [Dependency(new[] { typeof(ISkillTreeNavigation) }, typeof(SkillTreeNavigation), Lifecycle.Singleton, typeof(ISkillNotificationHandler))]
@@ -42,6 +42,11 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private SkillPanelUI skillPanelUI;
     [Dependency(new[] { typeof(ISkillTree) }, typeof(SkillTree), Lifecycle.Singleton, typeof(ISkillPanelManager))]
     [SerializeField] private SkillTree skillTree;
+    [Dependency(new[] { typeof(ISkillGuiManager) }, typeof(SkillGuiManager), Lifecycle.Singleton, typeof(ISkillTreeManager), typeof(ISkillGuiPanel), typeof(IUIManager))]
+    [SerializeField] private SkillGuiManager skillGuiManager;
+
+    [Dependency(new[] { typeof(ISkillGuiPanel) }, typeof(SkillGuiPanel), Lifecycle.Singleton)]
+    [SerializeField] private SkillGuiPanel skillGuiPanel;
 
     private static FieldInfo[] _dependencyFields;
     private static FieldInfo[] _allFields;

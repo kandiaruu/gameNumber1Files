@@ -17,8 +17,8 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
     private Skill currentSkill;
     [InjectAttribute1]
     private ISkillTreeManager skillLogicManager { get; set; }
-    [InjectAttribute1]
-    private ISkillUIManager skillUIManager { get; set; }
+    [InjectAttribute1] private ISkillGuiManager skillGuiManager { get; set; }
+    private bool isResetMode = false; // Флаг для режима сброса
 
     public override void Awake()
     {
@@ -89,22 +89,51 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
         }
     }
 
+    public void ShowResetConfirmation(Skill skill, int dependentCount, System.Action onConfirm)
+    {
+        Debug.Log($"ShowResetConfirmation вызван для {skill.skillName} с {dependentCount} зависимыми навыками");
+        currentSkill = skill;
+        isResetMode = true;
+        Open();
+        ClearButtons();
+
+        notificationText.text = $"Навык \"{skill.skillName}\" имеет {dependentCount} зависимых навыков.\n";
+
+        var resetButton = AddButton("Сбросить", () =>
+        {
+            onConfirm?.Invoke();
+            isResetMode = false; // Сбрасываем режим перед закрытием
+            Close();
+        });
+        AddButton("Отмена", () => {
+            Close();
+        });
+
+        if (resetButton != null)
+        {
+            resetButton.Select(); // Фокус на кнопке "Сбросить"
+        }
+    }
+
     protected override void OnClose()
     {
+        if (isResetMode && currentSkill != null)
+        {
+            skillGuiManager?.ShowSkillGui(currentSkill); // Открываем SkillGuiPanel только в режиме сброса
+        }
         ClearButtons();
         currentSkill = null;
+        isResetMode = false;
         // Не обнуляем skillLogicManager, если он инжектируется
     }
 
-    private void AddButton(string buttonText, Action onClick)
+    private Button AddButton(string buttonText, System.Action onClick)
     {
-        if (buttonPrefab == null || buttonContainer == null) return;
-
-        Button newButton = UnityEngine.Object.Instantiate(buttonPrefab, buttonContainer);
-        var textComponent = newButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (textComponent != null) textComponent.text = buttonText;
-        newButton.onClick.AddListener(() => onClick?.Invoke());
-        dynamicButtons.Add(newButton);
+        var button = Instantiate(buttonPrefab, buttonContainer);
+        button.GetComponentInChildren<TextMeshProUGUI>().text = buttonText;
+        button.onClick.AddListener(() => onClick?.Invoke());
+        dynamicButtons.Add(button);
+        return button; // Возвращаем кнопку
     }
 
     private void ClearButtons()
