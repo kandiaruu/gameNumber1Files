@@ -7,6 +7,7 @@ public class SkillGuiPanel : BasePanel, ISkillGuiPanel
     [SerializeField] private TextMeshProUGUI skillInfoText;
     [SerializeField] private Button closeButton;
     [SerializeField] private Button resetButton;
+    [SerializeField] private Button upgradeButton; // Новая кнопка "Улучшить"
 
     [InjectAttribute1]
     private ISkillTreeManager skillTreeManager { get; set; }
@@ -21,9 +22,11 @@ public class SkillGuiPanel : BasePanel, ISkillGuiPanel
         if (skillInfoText == null) Debug.LogError("skillInfoText не назначен!");
         if (closeButton == null) Debug.LogError("closeButton не назначен!");
         if (resetButton == null) Debug.LogError("resetButton не назначен!");
+        if (upgradeButton == null) Debug.LogError("upgradeButton не назначен!");
 
         closeButton.onClick.AddListener(Close);
         resetButton.onClick.AddListener(ResetSkill);
+        upgradeButton.onClick.AddListener(UpgradeSkill);
     }
 
     public void ShowSkillGui(Skill skill)
@@ -39,8 +42,23 @@ public class SkillGuiPanel : BasePanel, ISkillGuiPanel
     {
         if (currentSkill == null) return;
 
-        skillInfoText.text = $"Навык: {currentSkill.skillName}";
-        resetButton.gameObject.SetActive(currentSkill.isUnlocked && currentSkill.canBeReset); // Условие для кнопки
+        skillInfoText.text = $"Навык: {currentSkill.skillName}\n" +
+                             $"Текущий уровень: {currentSkill.currentLevel}";
+
+        resetButton.gameObject.SetActive(currentSkill.isUnlocked && currentSkill.canBeReset);
+
+        TextMeshProUGUI upgradeButtonText = upgradeButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (currentSkill.maxUpgrades == 0 || currentSkill.currentLevel >= currentSkill.maxUpgrades)
+        {
+            upgradeButtonText.text = "МАКС. УРОВЕНЬ";
+            upgradeButton.interactable = false;
+        }
+        else
+        {
+            upgradeButtonText.text = $"УЛУЧШИТЬ";
+            upgradeButton.interactable = currentSkill.CanUpgrade(skillTreeManager.GetGold());
+        }
+        upgradeButton.gameObject.SetActive(currentSkill.isUnlocked);
     }
 
     private void ResetSkill()
@@ -50,9 +68,14 @@ public class SkillGuiPanel : BasePanel, ISkillGuiPanel
             skillTreeManager.ResetSkill(currentSkill.groupName, currentSkill.skillIndex);
             Close();
         }
-        else
+    }
+
+    private void UpgradeSkill()
+    {
+        if (currentSkill != null && skillTreeManager != null)
         {
-            Debug.LogError("SkillTreeManager или currentSkill не инициализированы!");
+            skillTreeManager.UpgradeSkill(currentSkill.groupName, currentSkill.skillIndex);
+            UpdateUI(); // Обновляем UI после улучшения
         }
     }
 

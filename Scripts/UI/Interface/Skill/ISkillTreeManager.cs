@@ -17,4 +17,5 @@ public interface ISkillTreeManager
     event System.Action OnSkillsUpdated;
     void SetSkillVisibility(string groupName, int skillIndex, bool isVisible);
     void ResetSkill(string groupName, int skillIndex); // Новый метод
+    void UpgradeSkill(string groupName, int skillIndex); // Новый метод
 }
