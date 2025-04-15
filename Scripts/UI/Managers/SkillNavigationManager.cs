@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 
 public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 {
@@ -15,6 +16,7 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
     private bool dragStartedInContainer = false;
 
     [InjectAttribute1] private IUIManager uiManager { get; set; }
+    [InjectAttribute1] private ISkillPanelManager skillPanelManager { get; set; }
 
     private struct PanelStateData
     {
@@ -22,6 +24,8 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
         public Vector3 Scale;
     }
     private Dictionary<SkillPanelManager.SkillPanelState, PanelStateData> panelStates = new();
+
+    public Skill LastSkill; // Stores the last selected skill
 
     private void Awake()
     {
@@ -73,6 +77,49 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
             skillHolder.anchoredPosition = ClampPosition(newPosition);
         }
     }
+    public void CenterOnSkill(Skill skill)
+    {
+        LastSkill = skill; // Сохраняем последний выбранный навык
+        if (skill == null || skill.skillButton == null)
+        {
+            Debug.LogWarning("Навык или его кнопка не назначены!");
+            return;
+        }
+
+        RectTransform skillRect = skill.skillButton.GetComponent<RectTransform>();
+        if (skillRect == null)
+        {
+            Debug.LogWarning("RectTransform кнопки навыка не найден!");
+            return;
+        }
+
+        // Получаем позицию навыка в мировых координатах
+        Vector3 worldPos = skillRect.position;
+
+        // Переводим её в локальные координаты относительно skillHolder
+        Vector3 localInHolder3D = skillHolder.InverseTransformPoint(worldPos);
+        Vector2 localInHolder = new Vector2(localInHolder3D.x, localInHolder3D.y);
+
+        // Центр контейнера — учитываем, что anchor у skillHolder (0,1) — top-left
+        Vector2 containerCenter = new Vector2(
+            skillTreeContainer.rect.width / 2f,
+            -skillTreeContainer.rect.height / 2f // Y вниз
+        );
+
+        // Вычисляем новое положение skillHolder
+        Vector2 offset = containerCenter - localInHolder * skillHolder.localScale.x;
+        skillHolder.anchoredPosition = ClampPosition(offset);
+    }
+
+    public Skill getLastSkill()
+    {
+        return LastSkill;
+    }
+
+    public void inputLastSkill(Skill skill)
+    {
+        LastSkill = skill;
+    }
 
     private void HandleZoom(float scrollDelta)
     {
@@ -116,7 +163,7 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
     public void ResetNavigation()
     {
         skillHolder.anchoredPosition = new Vector2(960f, -455f);
-        skillHolder.localScale = Vector3.one;
+        skillHolder.localScale = new Vector3(0.8f, 0.8f, 1f);
     }
 
     private void OnDisable()

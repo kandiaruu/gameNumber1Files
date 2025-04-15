@@ -56,4 +56,11 @@ public class SkillGuiManager : MonoBehaviour, ISkillGuiManager
             skillGuiPanel.Close();
         }
     }
+    public void UpdateUI()
+    {
+        if (skillGuiPanel != null && skillGuiPanel.IsOpen)
+        {
+            skillGuiPanel.UpdateUI();
+        }
+    }
 }

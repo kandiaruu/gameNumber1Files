@@ -88,6 +88,15 @@ public class SkillPanelManager : MonoBehaviour, ISkillPanelManager
             return;
         }
 
+        if (panel.panelName == "Hidden")
+        {
+            skillTreeNavigation.CenterOnSkill(skillTreeNavigation.getLastSkill());
+        }
+        else
+        {
+            skillTreeNavigation.ResetNavigation();
+        }
+
         panel.panelObject.SetActive(true);
         CurrentGroupName = panel.panelName;
         currentSkillState = (SkillPanelState)System.Enum.Parse(typeof(SkillPanelState), panel.panelName);
@@ -100,8 +109,9 @@ public class SkillPanelManager : MonoBehaviour, ISkillPanelManager
             }
         }
 
-        skillTreeNavigation?.ResetNavigation();
         skillPanelUI?.UpdateSkillsButtonText();
+        skillPanelUI?.ClearPanelButtons(); // Очищаем кнопки
+        skillPanelUI?.CreatePanelButtons(); // Пересоздаём кнопки с новым выделением
     }
 
     public string GetCurrentPanelName()

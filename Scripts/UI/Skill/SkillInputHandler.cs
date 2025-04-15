@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using System.Linq;
+using UnityEngine.UI;
+using System.Text.RegularExpressions;
 
 public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 {
@@ -71,7 +73,11 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
                 {
                     float pressDuration = Time.unscaledTime - pressStartTime;
                     if (pressDuration <= clickThreshold) // Проверяем, что это клик, а не удержание
-                    {
+                    {   
+                        if (skillPanelManager.GetCurrentPanelName() == "Hidden")
+                        {
+                            skillTreeNavigation.inputLastSkill(skill); // Передаем навык в менеджер панели
+                        }
                         if (skill.isUnlocked && skillGuiManager != null)
                         {
                             skillGuiManager.ShowSkillGui(skill); // Показываем SkillGui для разблокированного навыка
@@ -79,10 +85,6 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
                         else if (!skill.isUnlocked && notificationHandler != null)
                         {
                             notificationHandler.ShowNotification(skill); // Существующая логика для заблокированных навыков
-                        }
-                        else if (notificationHandler == null)
-                        {
-                            Debug.LogError("NotificationHandler is null when clicking skill!");
                         }
                     }
                 });
@@ -124,7 +126,7 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
             Debug.Log($"Тултип включён для панели {activePanelConfig?.panelType}");
         }
 
-        if (!skill.questionIcon.activeSelf && !skillTreeNavigation.isDragging)
+        if (!skill.questionIcon.activeSelf && !skillTreeNavigation.isDragging && skill.isVisible)
         {
             tooltipManager.ShowTooltip(skill, Input.mousePosition);
             lastHoveredSkill = skill;

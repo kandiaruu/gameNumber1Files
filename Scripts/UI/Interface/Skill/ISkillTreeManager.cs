@@ -18,4 +18,6 @@ public interface ISkillTreeManager
     void SetSkillVisibility(string groupName, int skillIndex, bool isVisible);
     void ResetSkill(string groupName, int skillIndex); // Новый метод
     void UpgradeSkill(string groupName, int skillIndex); // Новый метод
+    void ResetSkillUpgrades(string groupName, int skillIndex);
+    void ResetSkillToLevel(string groupName, int skillIndex, int targetLevel);
 }

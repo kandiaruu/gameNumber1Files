@@ -44,7 +44,7 @@ public class NotificationManager : MonoBehaviour, INotificationManager
         }
     }
 
-        public void ShowNotification(Skill skill, int dependentCount, System.Action onConfirm)
+    public void ShowNotification(Skill skill, int dependentCount, System.Action onConfirm)
     {
         if (notificationPanel != null)
         {

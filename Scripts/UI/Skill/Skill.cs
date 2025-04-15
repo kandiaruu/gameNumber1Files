@@ -103,8 +103,10 @@ public class Skill
         questionIcon.SetActive(!isUnlocked && !hasQuestionState);
 
         TextMeshProUGUI buttonText = skillButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (isUnlocked)
-            buttonText.text = "Разблокировано";
+        if (isUnlocked && currentLevel == maxUpgrades)
+            buttonText.text = "MAX LVLEL";
+        else if (isUnlocked && currentLevel > 0)
+            buttonText.text = "Unlocked";
         else if (canUnlock && hasQuestionState)
             buttonText.text = skillName;
         else
@@ -202,7 +204,7 @@ public class Skill
     
 public void SetupDependencyLines(Skill[] groupSkills, GameObject lineParentObject)
 {
-    Debug.Log($"Создаём линии для навыка {skillName}");
+    // Debug.Log($"Создаём линии для навыка {skillName}");
 
     foreach (var line in dependencyLines)
     {
@@ -212,7 +214,7 @@ public void SetupDependencyLines(Skill[] groupSkills, GameObject lineParentObjec
 
     if (prerequisiteIndices == null || prerequisiteIndices.Length == 0)
     {
-        Debug.Log($"Нет зависимостей для навыка {skillName}");
+        // Debug.Log($"Нет зависимостей для навыка {skillName}");
         return;
     }
 
@@ -249,7 +251,7 @@ void UpdateDependencyLines(Skill[] groupSkills)
 {
     if (dependencyLines.Count == 0 || prerequisiteIndices == null)
     {
-        Debug.Log($"Нет линий для {skillName}: dependencyLines.Count = {dependencyLines.Count}, prerequisiteIndices = {prerequisiteIndices?.Length}");
+        // Debug.Log($"Нет линий для {skillName}: dependencyLines.Count = {dependencyLines.Count}, prerequisiteIndices = {prerequisiteIndices?.Length}");
         return;
     }
 
@@ -326,7 +328,7 @@ void UpdateDependencyLines(Skill[] groupSkills)
                 dependencyLines[lineIndex].color = Color.white;
             }
 
-            Debug.Log($"Линия {skillName} <- {prereqSkill.skillName}: ({localStart}) -> ({localEnd})");
+            // Debug.Log($"Линия {skillName} <- {prereqSkill.skillName}: ({localStart}) -> ({localEnd})");
         }
 
         lineIndex++;

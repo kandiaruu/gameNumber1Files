@@ -10,6 +10,8 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
     [SerializeField] private TextMeshProUGUI notificationText;
     [SerializeField] private Transform buttonContainer;
     [SerializeField] private Button buttonPrefab;
+    [SerializeField] private Slider levelSlider; // Добавляем ползунок
+    [SerializeField] private TextMeshProUGUI sliderValueText; // Текст для отображения значения ползунка
     [SerializeField] private Vector2 fixedPosition = new Vector2(960f, -540f);
 
     private RectTransform notificationRect;
@@ -17,8 +19,9 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
     private Skill currentSkill;
     [InjectAttribute1]
     private ISkillTreeManager skillLogicManager { get; set; }
-    [InjectAttribute1] private ISkillGuiManager skillGuiManager { get; set; }
-    private bool isResetMode = false; // Флаг для режима сброса
+    [InjectAttribute1]
+    private ISkillGuiManager skillGuiManager { get; set; }
+    private bool isResetMode = false;
 
     public override void Awake()
     {
@@ -29,10 +32,15 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
         if (notificationText == null) Debug.LogError("notificationText не назначен!");
         if (buttonContainer == null) Debug.LogError("buttonContainer не назначен!");
         if (buttonPrefab == null) Debug.LogError("buttonPrefab не назначен!");
+        if (levelSlider == null) Debug.LogError("levelSlider не назначен!");
+        if (sliderValueText == null) Debug.LogError("sliderValueText не назначен!");
+
+        levelSlider.onValueChanged.AddListener(OnSliderValueChanged);
     }
 
     public void ShowNotification(Skill skill, ISkillTreeManager skillTreeManager = null)
     {
+        // Существующий код без изменений
         Debug.Log("ShowNotification вызван для " + skill.skillName);
         currentSkill = skill;
         skillLogicManager = skillTreeManager ?? skillLogicManager;
@@ -91,40 +99,88 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
 
     public void ShowResetConfirmation(Skill skill, int dependentCount, System.Action onConfirm)
     {
+        // Существующий код без изменений
         Debug.Log($"ShowResetConfirmation вызван для {skill.skillName} с {dependentCount} зависимыми навыками");
         currentSkill = skill;
         isResetMode = true;
         Open();
         ClearButtons();
-
+    
+        if (dependentCount > 0) {
         notificationText.text = $"Навык \"{skill.skillName}\" имеет {dependentCount} зависимых навыков.\n";
+        }
+        else {
+        notificationText.text = $"У Навыка \"{skill.skillName}\" {skill.currentLevel} уровень.\n" +
+                                $"Вы уверены, что хотите сбросить его?";
+        }
 
         var resetButton = AddButton("Сбросить", () =>
         {
             onConfirm?.Invoke();
-            isResetMode = false; // Сбрасываем режим перед закрытием
+            isResetMode = false;
             Close();
         });
         AddButton("Отмена", () => {
             Close();
         });
+    }
 
-        if (resetButton != null)
+    public void ShowUpgradeResetNotification(Skill skill, ISkillTreeManager skillTreeManager)
+    {
+        Debug.Log($"ShowUpgradeResetNotification вызван для {skill.skillName}");
+        currentSkill = skill;
+        skillLogicManager = skillTreeManager;
+        isResetMode = true;
+        Open();
+        ClearButtons();
+
+        // Настраиваем ползунок
+        levelSlider.gameObject.SetActive(true);
+        sliderValueText.gameObject.SetActive(true);
+        levelSlider.minValue = 1;
+        levelSlider.maxValue = skill.currentLevel - 1; // До какого уровня можно сбросить
+        levelSlider.wholeNumbers = true;
+        levelSlider.value = skill.currentLevel - 1; // Начальное значение
+        UpdateSliderText();
+
+        notificationText.text = $"В1";
+
+        AddButton("Сбросить", () =>
         {
-            resetButton.Select(); // Фокус на кнопке "Сбросить"
-        }
+            int targetLevel = (int)levelSlider.value;
+            skillLogicManager.ResetSkillToLevel(currentSkill.groupName, currentSkill.skillIndex, targetLevel);
+            skillGuiManager.UpdateUI(); // Обновляем UI после сброса
+            Close();
+        });
+        AddButton("Отмена", () =>
+        {
+            Close();
+        });
+
+        levelSlider.Select(); // Фокус на ползунке
+    }
+
+    private void OnSliderValueChanged(float value)
+    {
+        UpdateSliderText();
+    }
+
+    private void UpdateSliderText()
+    {
+        sliderValueText.text = $"Сбросить до уровня: {(int)levelSlider.value}";
     }
 
     protected override void OnClose()
     {
         if (isResetMode && currentSkill != null)
         {
-            skillGuiManager?.ShowSkillGui(currentSkill); // Открываем SkillGuiPanel только в режиме сброса
+            skillGuiManager?.ShowSkillGui(currentSkill);
         }
         ClearButtons();
+        levelSlider.gameObject.SetActive(false);
+        sliderValueText.gameObject.SetActive(false);
         currentSkill = null;
         isResetMode = false;
-        // Не обнуляем skillLogicManager, если он инжектируется
     }
 
     private Button AddButton(string buttonText, System.Action onClick)
@@ -133,7 +189,7 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
         button.GetComponentInChildren<TextMeshProUGUI>().text = buttonText;
         button.onClick.AddListener(() => onClick?.Invoke());
         dynamicButtons.Add(button);
-        return button; // Возвращаем кнопку
+        return button;
     }
 
     private void ClearButtons()

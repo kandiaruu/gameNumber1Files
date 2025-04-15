@@ -51,31 +51,45 @@ public class SkillPanelUI : BasePanel, ISkillPanelUI
         }
     }
 
-    private void CreatePanelButtons()
+public void CreatePanelButtons()
+{
+    if (buttonContainer == null || buttonPrefab == null)
     {
-        if (buttonContainer == null || buttonPrefab == null)
-        {
-            Debug.LogError("Button container or prefab not assigned!");
-            return;
-        }
+        Debug.LogError("Button container or prefab not assigned!");
+        return;
+    }
 
-        foreach (var panel in skillPanelManager.GetPanels())
+    string currentPanelName = skillPanelManager.GetCurrentPanelName(); // Получаем имя текущей панели
+
+    foreach (var panel in skillPanelManager.GetPanels())
+    {
+        if (panel.isSelectable) // Создаем кнопку только если панель доступна для выбора
         {
-            if (panel.isSelectable) // Создаем кнопку только если панель доступна для выбора
+            Button button = Instantiate(buttonPrefab, buttonContainer);
+            button.GetComponentInChildren<TextMeshProUGUI>().text = panel.panelName;
+
+            // Проверяем, является ли эта кнопка текущей активной панелью
+            if (panel.panelName == currentPanelName)
             {
-                Button button = Instantiate(buttonPrefab, buttonContainer);
-                button.GetComponentInChildren<TextMeshProUGUI>().text = panel.panelName;
-                button.onClick.AddListener(() => 
+                // Устанавливаем цвет кнопки в #005EA6
+                var buttonImage = button.GetComponent<Image>();
+                if (buttonImage != null)
                 {
-                    skillPanelManager.SwitchToPanel(panel);
-                    if (panelSelection != null)
-                    {
-                        Close();
-                    }
-                });
+                    buttonImage.color = new Color32(255,255,255, 255); // Цвет текста кнопки
+                }
             }
+
+            button.onClick.AddListener(() => 
+            {
+                skillPanelManager.SwitchToPanel(panel);
+                if (panelSelection != null)
+                {
+                    Close();
+                }
+            });
         }
     }
+}
 
     public void UpdateSkillsButtonText()
     {
@@ -101,7 +115,7 @@ public class SkillPanelUI : BasePanel, ISkillPanelUI
     }
 
     // Пример метода очистки кнопок
-    private void ClearPanelButtons()
+    public void ClearPanelButtons()
     {
         foreach (Transform child in buttonContainer)
         {
