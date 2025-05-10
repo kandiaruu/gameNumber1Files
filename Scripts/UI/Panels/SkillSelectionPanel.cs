@@ -42,7 +42,7 @@ public class SkillPanelUI : BasePanel, ISkillPanelUI
         }
     }
 
-    private void TogglePanelSelection()
+    public void TogglePanelSelection()
     {
         if (panelSelection != null)
         {

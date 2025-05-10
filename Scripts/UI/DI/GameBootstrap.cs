@@ -35,18 +35,28 @@ public class GameBootstrap : MonoBehaviour
 
     [Dependency(new[] { typeof(ISkillTooltipPanel) }, typeof(SkillTooltipPanel), Lifecycle.Singleton)]
     [SerializeField] private SkillTooltipPanel skillTooltipPanel;
-    [Dependency(new[] { typeof(ISkillPanelManager) }, typeof(SkillPanelManager), Lifecycle.Singleton, typeof(ISkillTreeNavigation), typeof(ISkillPanelUI))] // Added ISkillPanelUI dependency
+
+    [Dependency(new[] { typeof(ISkillPanelManager) }, typeof(SkillPanelManager), Lifecycle.Singleton, typeof(ISkillTreeNavigation), typeof(ISkillPanelUI))]
     [SerializeField] private SkillPanelManager skillPanelManager;
 
-    [Dependency(new[] { typeof(ISkillPanelUI) }, typeof(SkillPanelUI), Lifecycle.Singleton, typeof(ISkillPanelManager), typeof(IUIManager))] // Added IUIManager dependency
+    [Dependency(new[] { typeof(ISkillPanelUI) }, typeof(SkillPanelUI), Lifecycle.Singleton, typeof(ISkillPanelManager), typeof(IUIManager))]
     [SerializeField] private SkillPanelUI skillPanelUI;
+
     [Dependency(new[] { typeof(ISkillTree) }, typeof(SkillTree), Lifecycle.Singleton, typeof(ISkillPanelManager))]
     [SerializeField] private SkillTree skillTree;
+    [Dependency(new[] { typeof(IInventory) }, typeof(Inventory), Lifecycle.Singleton, typeof(ITooltipManager), typeof(IInventoryPanel))]
+    [SerializeField] private Inventory inventory;
+
     [Dependency(new[] { typeof(ISkillGuiManager) }, typeof(SkillGuiManager), Lifecycle.Singleton, typeof(ISkillTreeManager), typeof(ISkillGuiPanel), typeof(IUIManager))]
     [SerializeField] private SkillGuiManager skillGuiManager;
 
     [Dependency(new[] { typeof(ISkillGuiPanel) }, typeof(SkillGuiPanel), Lifecycle.Singleton)]
     [SerializeField] private SkillGuiPanel skillGuiPanel;
+
+    [Dependency(new[] { typeof(IItemInfoManager) }, typeof(ItemInfoManager), Lifecycle.Singleton, typeof(IUIManager))]
+    [SerializeField] private ItemInfoManager itemInfoManager;
+    [Dependency(new[] { typeof(IInventoryPanel) }, typeof(InventoryPanel), Lifecycle.Singleton)]
+    [SerializeField] private InventoryPanel inventoryPanel;
 
     private static FieldInfo[] _dependencyFields;
     private static FieldInfo[] _allFields;

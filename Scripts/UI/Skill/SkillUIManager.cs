@@ -12,7 +12,6 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
     [SerializeField] private Button resetQuestionsButton;
     [InjectAttribute1] private ISkillTreeManager SkillLogicManager { get; set; }
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
-    [InjectAttribute1] private ISkillPanelManager skillPanelManager { get; set; }
     [InjectAttribute1] private IUIManager uiManager { get; set; }
     private Dictionary<string, ColorBlock[]> originalColorBlocks;
     private bool lastButtonState = true; // Для отслеживания изменений состояния
@@ -28,7 +27,6 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
     {
         if (SkillLogicManager == null) throw new System.NullReferenceException("SkillLogicManager is not injected!");
         if (skillTreeNavigation == null) throw new System.NullReferenceException("SkillTreeNavigation is not injected!");
-        if (skillPanelManager == null) throw new System.NullReferenceException("SkillPanelManager is not injected!");
 
         skillsResetButton.onClick.AddListener(() => 
         {

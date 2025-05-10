@@ -3,13 +3,15 @@ using TMPro;
 
 public class SkillTooltipPanel : BasePanel, ISkillTooltipPanel
 {
+    
     [SerializeField] private TextMeshProUGUI tooltipText;
     [SerializeField] private float offsetX = 375f;
     [SerializeField] private RectTransform skillTreeContainer;
-    [SerializeField] private float moveSpeed = 10f; // Скорость перемещения
+    [SerializeField] private float moveSpeed = 10f;
     private RectTransform tooltipRect;
     private Vector3 targetPosition;
     private bool isMoving = false;
+    public bool InventoryToolTip = false;
 
     public override void Awake()
     {
@@ -43,52 +45,72 @@ public class SkillTooltipPanel : BasePanel, ISkillTooltipPanel
                          $"Макс. улучшений: {skill.maxUpgrades}";
         tooltipText.text = content;
 
-        // При первом появлении телепортируемся мгновенно
-        SetTooltipPosition(mousePosition, true);
+        SetTooltipPosition(mousePosition, true, false);
+        InventoryToolTip = false;
+    }
+
+    public void ShowTooltip(string content, Vector3 mousePosition)
+    {
+        Open();
+        tooltipText.text = content;
+        SetTooltipPosition(mousePosition, true, true);
+        InventoryToolTip = true;
     }
 
     public void UpdatePosition(Vector3 mousePosition)
-    {
-        // После появления используем плавное перемещение
-        SetTooltipPosition(mousePosition, false);
+    {   
+        if (InventoryToolTip) 
+        {
+            SetTooltipPosition(mousePosition, false, true);
+        }
+        else 
+        {
+            SetTooltipPosition(mousePosition, false, false);
+        }
     }
 
-    private void SetTooltipPosition(Vector3 mousePosition, bool instantMove = false)
+    private void SetTooltipPosition(Vector3 mousePosition, bool instantMove = false, bool InventoryToolTip = false)
     {
-        Vector3 newTargetPosition = new Vector3(mousePosition.x + offsetX, mousePosition.y, 0f);
         Vector2 tooltipSize = tooltipRect.rect.size;
 
-        // Получаем границы skillTreeContainer в мировых координатах
+        Vector3 newTargetPosition;
+        
+        if (InventoryToolTip) {
+            newTargetPosition = new Vector3(
+                mousePosition.x + offsetX + tooltipSize.x / 2f,
+                mousePosition.y + tooltipSize.y / 2f,
+                0f
+            );
+        }
+        else
+        {
+            newTargetPosition = new Vector3(
+            mousePosition.x + offsetX + tooltipSize.x / 2f,
+            mousePosition.y - tooltipSize.y / 2f,
+            0f
+            );
+        }
+
         Vector3[] containerCorners = new Vector3[4];
         skillTreeContainer.GetWorldCorners(containerCorners);
-        
-        // Горизонтальные границы
-        float containerRight = containerCorners[2].x - (tooltipSize.x / 2);
-        float containerLeft = containerCorners[0].x + (tooltipSize.x / 2);
-        
-        // Вертикальные границы
-        float containerTop = containerCorners[1].y - (tooltipSize.y / 2);
-        float containerBottom = containerCorners[0].y + (tooltipSize.y / 2);
 
-        // Проверяем горизонтальные границы
-        if (newTargetPosition.x > containerRight)
-        {
-            newTargetPosition.x = containerRight;
-        }
-        if (newTargetPosition.x < containerLeft)
-        {
-            newTargetPosition.x = containerLeft;
-        }
+        float containerLeft = containerCorners[0].x;
+        float containerRight = containerCorners[2].x;
+        float containerTop = containerCorners[1].y;
+        float containerBottom = containerCorners[0].y;
 
-        // Проверяем вертикальные границы
-        if (newTargetPosition.y > containerTop)
-        {
-            newTargetPosition.y = containerTop;
-        }
-        if (newTargetPosition.y < containerBottom)
-        {
-            newTargetPosition.y = containerBottom;
-        }
+        float halfWidth = tooltipSize.x / 2f;
+        float halfHeight = tooltipSize.y / 2f;
+
+        if (newTargetPosition.x + halfWidth > containerRight)
+            newTargetPosition.x = containerRight - halfWidth;
+        if (newTargetPosition.x - halfWidth < containerLeft)
+            newTargetPosition.x = containerLeft + halfWidth;
+
+        if (newTargetPosition.y + halfHeight > containerTop)
+            newTargetPosition.y = containerTop - halfHeight;
+        if (newTargetPosition.y - halfHeight < containerBottom)
+            newTargetPosition.y = containerBottom + halfHeight;
 
         if (instantMove)
         {

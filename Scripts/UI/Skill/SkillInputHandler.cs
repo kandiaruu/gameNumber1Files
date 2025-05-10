@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using System.Linq;
 using UnityEngine.UI;
 using System.Text.RegularExpressions;
+using System.Collections;
 
 public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 {
@@ -17,6 +18,7 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
     private bool wasDraggingLastFrame = false;
     private float pressStartTime;
     private float clickThreshold = 0.2f;
+    private Coroutine hoverCoroutine;
     private GameObject panelSelection;
 
     private void Start()
@@ -48,6 +50,10 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
                 tooltipManager.UpdatePosition(Input.mousePosition);
             }
             wasDraggingLastFrame = skillTreeNavigation.isDragging;
+        }
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            skillPanelManager.toggleSelection(); // Переключаем панель выбора
         }
     }
 
@@ -101,29 +107,35 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 
     public void OnPointerEnter(Skill skill)
     {
+        if (hoverCoroutine != null)
+            StopCoroutine(hoverCoroutine);
+        
+        hoverCoroutine = StartCoroutine(DelayedTooltip(skill));
+    }
+    
+    private IEnumerator DelayedTooltip(Skill skill)
+    {
+        yield return new WaitForSecondsRealtime(0.05f); // задержка в 0.2 секунды
+
         panelSelection = uiManager.GetPanel(UIManager.PanelType.Selection); 
         string currentGroup = skillPanelManager?.GetCurrentPanelName();
         if (string.IsNullOrEmpty(currentGroup))
         {
             Debug.LogWarning("Текущая группа не установлена в SkillTreeNavigation!");
-            return;
+            yield break;
         }
 
         if (skill.groupName != currentGroup)
         {
             Debug.Log($"Skill {skill.skillName} не принадлежит текущей группе {currentGroup}. Игнорируем наведение.");
-            return;
+            yield break;
         }
 
-        // Проверяем, разрешён ли тултип для активной панели (включая дочерние)
         var activePanelConfig = uiManager.FindActivePanelConfig();
         if (activePanelConfig != null && !activePanelConfig.showTooltip)
         {
             Debug.Log($"Тултип отключён для панели {activePanelConfig.panelType}");
-            return;
-        }
-        else {
-            Debug.Log($"Тултип включён для панели {activePanelConfig?.panelType}");
+            yield break;
         }
 
         if (!skill.questionIcon.activeSelf && !skillTreeNavigation.isDragging && skill.isVisible)
@@ -135,8 +147,15 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
 
     public void OnPointerExit()
     {
+        if (hoverCoroutine != null)
+        {
+            StopCoroutine(hoverCoroutine);
+            hoverCoroutine = null;
+        }
+
         tooltipManager.HideTooltip();
     }
+
 
     private void CheckHoverAfterDrag()
     {

@@ -113,7 +113,9 @@ public class SkillPanelManager : MonoBehaviour, ISkillPanelManager
         skillPanelUI?.ClearPanelButtons(); // Очищаем кнопки
         skillPanelUI?.CreatePanelButtons(); // Пересоздаём кнопки с новым выделением
     }
-
+    public void toggleSelection() {
+        skillPanelUI?.TogglePanelSelection();
+    }
     public string GetCurrentPanelName()
     {
         return CurrentGroupName;

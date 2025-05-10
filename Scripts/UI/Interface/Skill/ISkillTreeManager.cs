@@ -10,8 +10,6 @@ public interface ISkillTreeManager
     Skill[] GetAllSkillsInGroup(string groupName);
     int GetGold();
     SkillGroup[] GetSkillGroups();
-    void EnableSkillButtons(bool enable);
-    void OnNotificationPanelClosed();
     event System.Action<int> OnSkillPointsChanged;
     event System.Action<int> OnGoldChanged;
     event System.Action OnSkillsUpdated;

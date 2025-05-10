@@ -1,6 +1,6 @@
-public class SkillTree : BasePanel, ISkillTree
+public class Inventory : BasePanel, IInventory
 {
-    [InjectAttribute1] private ISkillPanelManager skillPanelManager { get; set; }
+    [InjectAttribute1] private IInventoryPanel inventoryPanel { get; set; } // Инъекция зависимости для IInventorySlot
     [InjectAttribute1] private ITooltipManager tooltipManager { get; set; } // Инъекция зависимости для IInventorySlot
     public override void Awake()
     {
@@ -9,7 +9,8 @@ public class SkillTree : BasePanel, ISkillTree
     public override void Close()
     {
         base.Close(); // Вызываем базовый метод, чтобы панель стала активной
-        skillPanelManager.SetInitialPanelState(); // Устанавливаем Normal как начальную панель
+        InventorySlot.ReturnHeldItem(); // Возвращаем удерживаемый предмет в инвентарь
         tooltipManager.HideTooltip(); // Скрываем тултип, если он открыт
+        inventoryPanel.resetFrameImagesAndInput(); // Сбрасываем изображения рамок слотов инвентаря
     }
 }

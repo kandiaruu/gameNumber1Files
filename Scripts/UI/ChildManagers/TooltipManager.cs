@@ -47,6 +47,18 @@ public class TooltipManager : MonoBehaviour, ITooltipManager
         }
     }
 
+    public void ShowTooltip(string content, Vector3 mousePosition)
+    {
+        if (tooltip != null)
+        {
+            tooltip.ShowTooltip(content, mousePosition);
+        }
+        else
+        {
+            Debug.LogWarning("Tooltip не инициализирован!");
+        }
+    }
+
     public void HideTooltip()
     {
         if (tooltip != null && tooltip.IsOpen)

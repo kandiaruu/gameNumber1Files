@@ -158,15 +158,12 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         skillPoints += points;
         OnSkillPointsChanged?.Invoke(skillPoints);
     }
-
     public int GetSkillPoints() => skillPoints;
     public Skill[] GetAllSkills() => skillGroups.SelectMany(g => g.skills).ToArray();
     public Skill[] GetAllSkillsInGroup(string groupName) =>
         skillGroups.FirstOrDefault(g => g.groupName == groupName)?.skills ?? new Skill[0];
     public int GetGold() => gold;
     public SkillGroup[] GetSkillGroups() => skillGroups;
-    public void EnableSkillButtons(bool enable) { }
-    public void OnNotificationPanelClosed() { }
 
     public void SetSkillVisibility(string groupName, int skillIndex, bool isVisible)
     {

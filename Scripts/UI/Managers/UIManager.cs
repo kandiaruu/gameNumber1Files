@@ -10,7 +10,8 @@ public class UIManager : MonoBehaviour, IUIManager
         Notification,
         Tooltip,
         Selection,
-        SkillGui
+        SkillGui,
+        ItemInfo
     }
 
     [System.Serializable]
@@ -172,7 +173,7 @@ public class UIManager : MonoBehaviour, IUIManager
             if (currentPanel != null)
             {
                 currentPanel.Open();
-                SetGamePaused(panelType != PanelType.Inventory);
+                SetGamePaused(true);
                 UpdateSkillComponentsState();
                 UpdateScriptStates(panelType);
             }
