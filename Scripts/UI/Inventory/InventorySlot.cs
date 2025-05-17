@@ -108,6 +108,14 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     private void Update()
     {
+        if (heldItem == null && isCursorInSlot && item != null && realHoveredSlot != null)
+        {
+            if (Input.GetMouseButton(0) && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)))
+            {
+                realHoveredSlot.TryMoveToOtherPanel();
+                return;
+            }
+        }
         if (heldItem != null && Input.GetMouseButton(1))
         {
             if (!isRightDragging)
@@ -124,7 +132,6 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
             {
                 if (item == null || item.id == heldItem.id)
                 {
-                    Debug.Log("start");
                     LKMraztagivanie = true;
                     int maxStackSize = heldItem.maxStackSize;
                     leftDragUsedSlots.Add(realHoveredSlot);
@@ -158,7 +165,7 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
                     if (amountPerSlot > maxStackSize)
                     {
-                        remainder = amountPerSlot-maxStackSize;
+                        remainder = amountPerSlot - maxStackSize;
                         amountPerSlot = maxStackSize;
                     }
 
@@ -171,7 +178,6 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
                         canSwap = true;
                     }
 
-                    Debug.Log($"Amount per slot: {amountPerSlot}, Remainder: {remainder}");
                     foreach (var slot in leftDragUsedSlots)
                     {
                         if (slot.item == null)
@@ -565,6 +571,17 @@ private void HandleItemCountInput()
         }
     }
 }
+
+public bool HasItem()
+{
+    return item != null;
+}
+
+public Item GetItem()
+{
+    return item;
+}
+
     public void SetItem(Item newItem)
     {
         item = newItem;
@@ -656,30 +673,30 @@ public void OnScroll(PointerEventData eventData)
 public void OnPointerDown(PointerEventData eventData)
 {   
     if (isIllusion) return; // Игнорируем нажатия по иллюзии
-    if (eventData.button == PointerEventData.InputButton.Left)
-    {
-        isCursorInSlot = true;
-        hasPickedUp = false;
-        isHoldingLeftClick = true;
-        leftClickHoldStartTime = Time.unscaledTime;
-        hasTriedDropAfterHold = false;
-
-        if (item != null && heldItem == null)
+    if (eventData.button == PointerEventData.InputButton.Left && !(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)))
         {
-            LKMstart = true;
-            heldItem = new Item(item.id, item.itemName, item.description, item.icon, item.stackSize, item.maxStackSize, item.isModifiable);
-            heldSlot = this;
-            ClearSlot();
-            CreateHeldIcon();
-            hasPickedUp = true;
-            itemPickupTime = Time.unscaledTime;
+            isCursorInSlot = true;
+            hasPickedUp = false;
+            isHoldingLeftClick = true;
+            leftClickHoldStartTime = Time.unscaledTime;
+            hasTriedDropAfterHold = false;
+
+            if (item != null && heldItem == null)
+            {
+                LKMstart = true;
+                heldItem = new Item(item.id, item.itemName, item.description, item.icon, item.stackSize, item.maxStackSize, item.isModifiable);
+                heldSlot = this;
+                ClearSlot();
+                CreateHeldIcon();
+                hasPickedUp = true;
+                itemPickupTime = Time.unscaledTime;
+            }
         }
-    }
-    else if (eventData.button == PointerEventData.InputButton.Right)
-    {
-        isCursorInSlot = true;
-        rightClickHoldStartTime = Time.unscaledTime;
-    }
+        else if (eventData.button == PointerEventData.InputButton.Right)
+        {
+            isCursorInSlot = true;
+            rightClickHoldStartTime = Time.unscaledTime;
+        }
 }
 
 public void OnPointerUp(PointerEventData eventData)
@@ -953,66 +970,101 @@ private void TryPlaceHeldItem()
     private void HandleDoubleClick()
     {
         if (heldItem == null)
-        {
             return;
-        }
 
-        // Сколько нам еще нужно, чтобы заполнить стак до максимума
-        int remainingToFill = heldItem.maxStackSize - item.stackSize;
-        Debug.Log($"remainingToFill: {remainingToFill}, maxStackSize: {heldItem.maxStackSize}, stackSize: {item.stackSize}");
-        if (remainingToFill <= 0)
+        var panels = InventoryPanelsManager.Instance.GetPanelsForDoubleClick();
+
+        foreach (var panel in panels)
         {
-            return; // Если стак уже полон, ничего не делаем.
-        }
-        
-        heldItem.AddToStack(item.stackSize);
-        realHoveredSlot.ClearSlot();
-        UpdateHeldIcon();
-
-        // Получаем все слоты с тем же предметом, отсортированные по размеру стака (от меньшего к большему).
-        var slotsWithSameItem = inventoryPanel.slots
-            .Where(slot => slot.item != null && slot.item.id == heldItem.id)
-            .OrderBy(slot => slot.item.stackSize)  // Сортируем от меньшего к большему.
-            .ToList();
-
-        // Перебираем слоты и пытаемся добрать предметы в heldItem
-        foreach (var slot in slotsWithSameItem)
-        {
-            // Если нам уже не нужно больше предметов — выходим.
+            int remainingToFill = heldItem.maxStackSize - heldItem.stackSize;
             if (remainingToFill <= 0)
+                continue;
+
+            var slotsWithSameItem = panel.slots
+                .Where(slot => slot.item != null && slot.item.id == heldItem.id)
+                .OrderBy(slot => slot.item.stackSize)
+                .ToList();
+
+            foreach (var slot in slotsWithSameItem)
             {
-                break;
-            }
+                if (remainingToFill <= 0)
+                    break;
 
-            // Сколько предметов можем взять из этого слота
-            int amountToMove = Mathf.Min(slot.item.stackSize, remainingToFill);
+                int amountToMove = Mathf.Min(slot.item.stackSize, remainingToFill);
 
-            // Если мы можем забрать предметы, забираем
-            if (amountToMove > 0)
-            {
-                heldItem.AddToStack(amountToMove);
-                slot.item.RemoveFromStack(amountToMove);
-
-                // Обновляем remainingToFill (сколько еще нужно добавить в heldItem)
-                remainingToFill -= amountToMove;
-
-                // Если в слоте не осталось предметов, очищаем слот
-                if (slot.item.stackSize <= 0)
+                if (amountToMove > 0)
                 {
-                    slot.ClearSlot();
-                }
-                else
-                {
-                    // Обновляем слот с новыми данными о предмете
-                    slot.SetItem(slot.item);
+                    heldItem.AddToStack(amountToMove);
+                    slot.item.RemoveFromStack(amountToMove);
+                    remainingToFill -= amountToMove;
+
+                    if (slot.item.stackSize <= 0)
+                        slot.ClearSlot();
+                    else
+                        slot.SetItem(slot.item);
                 }
             }
         }
 
-        // Обновляем иконку предмета в руках
         UpdateHeldIcon();
     }
 
+    private void TryMoveToOtherPanel()
+    {
+        if (item == null) return; // Нет предмета — ничего не делаем
+
+        var panels = InventoryPanelsManager.Instance.GetPanelsForDoubleClick()
+            .Where(p => p != this.inventoryPanel)
+            .ToList();
+
+        if (panels.Count == 0) return; // Нет других панелей
+
+        // Ищем первый подходящий слот (пустой или совместимый стек)
+        InventorySlot targetSlot = null;
+        foreach (var panel in panels)
+        {
+            // 1. Сначала ищем существующий стек этого предмета с незаполненным максимальным размером
+            targetSlot = panel.slots.FirstOrDefault(s =>
+                s.item != null &&
+                s.item.id == item.id &&
+                s.item.stackSize < s.item.maxStackSize
+            );
+            if (targetSlot != null) break;
+
+            // 2. Если не нашли — ищем пустой слот
+            targetSlot = panel.slots.FirstOrDefault(s => s.item == null);
+            if (targetSlot != null) break;
+        }
+
+        if (targetSlot == null) return; // Некуда класть
+
+        // Теперь либо добавляем в стек, либо полностью переносим в пустой слот
+        if (targetSlot.item != null && targetSlot.item.id == item.id)
+        {
+            int canMove = Math.Min(item.stackSize, targetSlot.item.maxStackSize - targetSlot.item.stackSize);
+            if (canMove > 0)
+            {
+                targetSlot.item.AddToStack(canMove);
+                item.RemoveFromStack(canMove);
+                targetSlot.SetItem(targetSlot.item);
+
+                if (item.stackSize <= 0)
+                {
+                    ClearSlot();
+                }
+                else
+                {
+                    SetItem(item);
+                }
+            }
+        }
+        else if (targetSlot.item == null)
+        {
+            // Полностью переносим
+            targetSlot.SetItem(item);
+            ClearSlot();
+        }
+    }
 
     private void CreateHeldIcon()
     {
@@ -1083,7 +1135,6 @@ private void TryPlaceHeldItem()
     {
         if (heldIcon != null)
         {
-            Debug.Log("des");
             Destroy(heldIcon);
             heldIcon = null;
             heldStackText = null;

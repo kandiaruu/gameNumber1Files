@@ -163,7 +163,7 @@ public class UIManager : MonoBehaviour, IUIManager
         OpenPanel(panelType);
     }
 
-    private void OpenPanel(PanelType panelType)
+    public void OpenPanel(PanelType panelType)
     {
         HideAllPanels();
         var config = FindPanelConfigByType(panelConfigs, panelType);

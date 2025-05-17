@@ -44,7 +44,7 @@ public class GameBootstrap : MonoBehaviour
 
     [Dependency(new[] { typeof(ISkillTree) }, typeof(SkillTree), Lifecycle.Singleton, typeof(ISkillPanelManager))]
     [SerializeField] private SkillTree skillTree;
-    [Dependency(new[] { typeof(IInventory) }, typeof(Inventory), Lifecycle.Singleton, typeof(ITooltipManager), typeof(IInventoryPanel))]
+    [Dependency(new[] { typeof(IInventory) }, typeof(Inventory), Lifecycle.Singleton, typeof(ITooltipManager), typeof(IInventoryPanel), typeof(IChestUIController))]
     [SerializeField] private Inventory inventory;
 
     [Dependency(new[] { typeof(ISkillGuiManager) }, typeof(SkillGuiManager), Lifecycle.Singleton, typeof(ISkillTreeManager), typeof(ISkillGuiPanel), typeof(IUIManager))]
@@ -57,6 +57,13 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private ItemInfoManager itemInfoManager;
     [Dependency(new[] { typeof(IInventoryPanel) }, typeof(InventoryPanel), Lifecycle.Singleton)]
     [SerializeField] private InventoryPanel inventoryPanel;
+    [Dependency(new[] { typeof(IChestPanel) }, typeof(InventoryPanel), Lifecycle.Singleton)]
+    [SerializeField] private InventoryPanel chestPanel;
+
+    [Dependency(new[] { typeof(IThirdPersonCharacter) }, typeof(ThirdPersonCharacter), Lifecycle.Singleton, typeof(IUIManager), typeof(IChestUIController))]
+    [SerializeField] private ThirdPersonCharacter thirdPersonCharacter;
+    [Dependency(new[] { typeof(IChestUIController) }, typeof(ChestUIController), Lifecycle.Singleton)]
+    [SerializeField] private ChestUIController chestUIController;
 
     private static FieldInfo[] _dependencyFields;
     private static FieldInfo[] _allFields;

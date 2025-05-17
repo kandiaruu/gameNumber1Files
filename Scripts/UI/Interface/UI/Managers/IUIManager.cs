@@ -7,4 +7,5 @@ public interface IUIManager
     UIManager.PanelConfig FindActivePanelConfig();
     bool ShouldAllowNavigation(); // Новый метод
     bool ShouldAllowSkillButtonInteraction(); // Новый метод
+    void OpenPanel(UIManager.PanelType panelType);
 }

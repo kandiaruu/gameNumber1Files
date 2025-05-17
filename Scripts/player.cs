@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class ThirdPersonCharacter : MonoBehaviour
+public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
 {
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float sprintSpeed = 10f;
@@ -11,7 +11,7 @@ public class ThirdPersonCharacter : MonoBehaviour
     [SerializeField] private float staminaDrainRate = 20f;
     [SerializeField] private float staminaRegenRate = 1.67f;
     [SerializeField] private float staminaRegenDelay = 15f;
-
+    [SerializeField] private float interactRange = 2f;
     public ThirdPersonCamera cameraController;
     private Rigidbody rb;
     private Vector3 moveVelocity;
@@ -21,9 +21,12 @@ public class ThirdPersonCharacter : MonoBehaviour
 
     private static readonly Vector3 GroundCheckOffset = Vector3.up * 0.1f;
     private static readonly KeyCode[] MovementKeys = { KeyCode.A, KeyCode.S, KeyCode.D, KeyCode.W };
+    [InjectAttribute1] private IUIManager uiManager { get; set; }
+    [InjectAttribute1] private IChestUIController chestUIController { get; set; }
 
     private void Awake()
     {
+        
         InitializeComponents();
         currentStamina = maxStamina;
         timeSinceLastSprint = staminaRegenDelay;
@@ -40,6 +43,10 @@ public class ThirdPersonCharacter : MonoBehaviour
 
     private void Update()
     {
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            TryOpenNearbyChest();
+        }
         // Stamina regeneration
         if (!Input.GetKey(KeyCode.LeftShift) || currentStamina <= 0)
         {
@@ -54,6 +61,21 @@ public class ThirdPersonCharacter : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             Jump();
+        }
+    }
+
+    void TryOpenNearbyChest()
+    {
+        Collider[] hits = Physics.OverlapSphere(transform.position, interactRange);
+
+        foreach (var hit in hits)
+        {
+            if (hit.TryGetComponent(out Chest chest))
+            {
+                uiManager.OpenPanel(UIManager.PanelType.Inventory);
+                chestUIController.OpenChestUI(chest);
+                break;
+            }
         }
     }
 
