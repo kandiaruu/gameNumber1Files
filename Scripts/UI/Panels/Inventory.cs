@@ -8,14 +8,20 @@ public class Inventory : BasePanel, IInventory
     {
         DependencyContainer1.InjectDependencies(this);
     }
+    public override void Open()
+    {
+        base.Open();
+        inventoryPanel.SetupInventory(24, 8);
+    }
     public override void Close()
     {
         base.Close(); // Вызываем базовый метод, чтобы панель стала активной
+        chestUIController.CloseChestUI(); // Закрываем UI сундука, если он открыт
+        InventorySlot.resetSearchMod(); // Сбрасываем режим поиска
         InventorySlot.ReturnHeldItem(); // Возвращаем удерживаемый предмет в инвентарь
         tooltipManager.HideTooltip(); // Скрываем тултип, если он открыт
         inventoryPanel.resetFrameImagesAndInput(); // Сбрасываем изображения рамок и ввод
         chestPanel.resetFrameImagesAndInput(); // Сбрасываем изображения рамок и ввод для сундука
-        chestUIController.CloseChestUI(); // Закрываем UI сундука, если он открыт
         chestUIController.SetUIPositionCenter(); // Устанавливаем позицию UI сундука в центр
     }
 }

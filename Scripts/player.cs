@@ -2,61 +2,33 @@ using UnityEngine;
 
 public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
 {
+    [SerializeField] private GameObject eKeyIcon;
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float sprintSpeed = 10f;
-    [SerializeField] private float rotationSpeed = 10f;
     [SerializeField] private float jumpForce = 10f;
     [SerializeField] private float groundCheckDistance = 0.2f;
-    [SerializeField] private float maxStamina = 100f;
-    [SerializeField] private float staminaDrainRate = 20f;
-    [SerializeField] private float staminaRegenRate = 1.67f;
-    [SerializeField] private float staminaRegenDelay = 15f;
-    [SerializeField] private float interactRange = 2f;
     public ThirdPersonCamera cameraController;
     private Rigidbody rb;
-    private Vector3 moveVelocity;
     private bool isGrounded;
-    private float currentStamina;
-    private float timeSinceLastSprint;
 
     private static readonly Vector3 GroundCheckOffset = Vector3.up * 0.1f;
-    private static readonly KeyCode[] MovementKeys = { KeyCode.A, KeyCode.S, KeyCode.D, KeyCode.W };
+
     [InjectAttribute1] private IUIManager uiManager { get; set; }
     [InjectAttribute1] private IChestUIController chestUIController { get; set; }
 
     private void Awake()
     {
-        
-        InitializeComponents();
-        currentStamina = maxStamina;
-        timeSinceLastSprint = staminaRegenDelay;
-    }
-
-    private void InitializeComponents()
-    {
         rb = GetComponent<Rigidbody>();
         if (!rb) Debug.LogError("No Rigidbody component found!");
-
-        cameraController ??= Object.FindFirstObjectByType<ThirdPersonCamera>();
-        if (!cameraController) Debug.LogError("No ThirdPersonCamera found!");
     }
 
     private void Update()
     {
+        CheckForChestAndToggleIcon();
         if (Input.GetKeyDown(KeyCode.E))
         {
             TryOpenNearbyChest();
         }
-        // Stamina regeneration
-        if (!Input.GetKey(KeyCode.LeftShift) || currentStamina <= 0)
-        {
-            timeSinceLastSprint += Time.deltaTime;
-            if (timeSinceLastSprint >= staminaRegenDelay)
-            {
-                RegenerateStamina();
-            }
-        }
-
         // Jump handling
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
@@ -64,17 +36,47 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
         }
     }
 
+    private void CheckForChestAndToggleIcon()
+    {
+        Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0);
+        Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
+        RaycastHit hit;
+        float maxDistance = 10f;
+
+        bool lookingAtChest = false;
+
+        if (Physics.Raycast(ray, out hit, maxDistance))
+        {
+            if (hit.collider.TryGetComponent(out Chest chest))
+            {
+                lookingAtChest = true;
+            }
+        }
+
+        // Включаем или выключаем иконку
+        if (eKeyIcon != null)
+            eKeyIcon.SetActive(lookingAtChest);
+    }
+
     void TryOpenNearbyChest()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, interactRange);
+        // Берём центр экрана (например, для UI точки по центру, как прицел)
+        Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0);
 
-        foreach (var hit in hits)
+        // Получаем луч из центра экрана в мире
+        Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
+        RaycastHit hit;
+
+        // Максимальная дистанция проверки, например 2f (можно увеличить/уменьшить по желанию)
+        float maxDistance = 10f;
+
+        // Проверяем, попали ли мы в сундук
+        if (Physics.Raycast(ray, out hit, maxDistance))
         {
-            if (hit.TryGetComponent(out Chest chest))
+            if (hit.collider.TryGetComponent(out Chest chest))
             {
                 uiManager.OpenPanel(UIManager.PanelType.Inventory);
                 chestUIController.OpenChestUI(chest);
-                break;
             }
         }
     }
@@ -82,19 +84,12 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
     private void FixedUpdate()
     {
         // Ground check
-        isGrounded = Physics.Raycast(transform.position + GroundCheckOffset, 
-            Vector3.down, groundCheckDistance + 0.1f);
+        isGrounded = Physics.Raycast(transform.position + GroundCheckOffset, Vector3.down, groundCheckDistance + 0.1f);
 
-        // Handle movement and rotation
+        // Handle movement relative to camera yaw
         Vector3 inputDirection = GetInputDirection();
         Move(inputDirection);
-        Rotate(inputDirection);
-
-        // If no input, dampen movement
-        if (inputDirection.sqrMagnitude < 0.01f)
-        {
-            DampenMovement();
-        }
+        RotateWithCamera();
     }
 
     private Vector3 GetInputDirection()
@@ -109,71 +104,29 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
     private void Move(Vector3 inputDirection)
     {
         float deltaTime = Time.fixedDeltaTime;
-        if (inputDirection.sqrMagnitude > 0.01f)
-        {
-            bool wantsToSprint = Input.GetKey(KeyCode.LeftShift);
-            float speed = (wantsToSprint && currentStamina > 0) ? sprintSpeed : moveSpeed;
+        bool wantsToSprint = Input.GetKey(KeyCode.LeftShift);
 
-            if (wantsToSprint && currentStamina > 0)
-            {
-                currentStamina = Mathf.Max(0, currentStamina - staminaDrainRate * deltaTime);
-                timeSinceLastSprint = 0f;
-            }
+        float speed = wantsToSprint ? sprintSpeed : moveSpeed;
 
-            Vector3 moveDirection = Quaternion.Euler(0, cameraController.yaw, 0) * inputDirection;
-            moveVelocity = moveDirection * speed;
-            rb.linearVelocity = new Vector3(moveVelocity.x, rb.linearVelocity.y, moveVelocity.z);
-        }
+        float yaw = cameraController != null ? cameraController.transform.eulerAngles.y : transform.eulerAngles.y;
+        Vector3 moveDirection = Quaternion.Euler(0, yaw, 0) * inputDirection;
+
+        Vector3 velocity = moveDirection * speed;
+        rb.linearVelocity = new Vector3(velocity.x, rb.linearVelocity.y, velocity.z);
     }
 
-    private void Rotate(Vector3 inputDirection)
+    private void RotateWithCamera()
     {
-        float deltaTime = Time.fixedDeltaTime;
-        float cameraYaw = cameraController.yaw;
-        Quaternion targetRotation;
-
-        if (inputDirection.sqrMagnitude > 0.01f && IsAnyMovementKeyPressed())
-        {
-            Vector3 moveDirection = Quaternion.Euler(0, cameraYaw, 0) * inputDirection;
-            targetRotation = Quaternion.LookRotation(moveDirection);
-        }
-        else
-        {
-            targetRotation = Quaternion.Euler(0, cameraYaw, 0);
-        }
-
-        transform.rotation = Quaternion.Slerp(transform.rotation, 
-            targetRotation, rotationSpeed * deltaTime);
-    }
-
-    private bool IsAnyMovementKeyPressed()
-    {
-        foreach (KeyCode key in MovementKeys)
-        {
-            if (Input.GetKey(key)) return true;
-        }
-        return false;
-    }
-
-    private void DampenMovement()
-    {
-        moveVelocity = Vector3.Lerp(moveVelocity, Vector3.zero, Time.fixedDeltaTime * 5f);
-        rb.linearVelocity = new Vector3(moveVelocity.x, rb.linearVelocity.y, moveVelocity.z);
+        if (cameraController == null) return;
+        // Always face the direction the camera is looking (Y axis only)
+        Vector3 euler = transform.eulerAngles;
+        euler.y = cameraController.transform.eulerAngles.y;
+        transform.eulerAngles = euler;
     }
 
     private void Jump()
     {
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
         isGrounded = false;
-    }
-
-    private void RegenerateStamina()
-    {
-        currentStamina = Mathf.Min(maxStamina, currentStamina + staminaRegenRate * Time.deltaTime);
-    }
-
-    public float GetStaminaPercentage()
-    {
-        return currentStamina / maxStamina;
     }
 }

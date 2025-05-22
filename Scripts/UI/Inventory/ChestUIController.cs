@@ -35,6 +35,10 @@ public class ChestUIController : MonoBehaviour, IChestUIController
         chestSkitGrid.SetActive(true);
         SetUIPositionLeft(); // Устанавливаем позицию UI влево
 
+        int slotsCount = chest.GetSlotsCount();
+        int columns = chest.size == ChestSize.Small ? 4 : 6;
+        inventoryPanel.SetupInventory(slotsCount, columns);
+        
         // 📦 Загружаем предметы сундука в UI
         inventoryPanel.LoadChestItems(currentChest.chestItems);
         InventoryPanelsManager.Instance.RegisterOpenPanel(inventoryPanel);

@@ -34,6 +34,8 @@ public class UIManager : MonoBehaviour, IUIManager
         public MonoBehaviour[] scriptsToDisable;
     }
 
+    [SerializeField] private GameObject eKeyIcon;
+    [SerializeField] private GameObject dotObject;
     [SerializeField] private List<PanelConfig> panelConfigs = new List<PanelConfig>();
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
     [InjectAttribute1] private ISkillTreeManager skillLogicManager{ get; set; }
@@ -69,6 +71,42 @@ public class UIManager : MonoBehaviour, IUIManager
         HideAllPanels(); // Moved to Start to ensure all Awake() methods have completed
     }
     
+    private void UpdateDotVisibility()
+    {
+        // Проверяем, есть ли открытые панели
+        bool anyPanelOpen = false;
+
+        foreach (var config in panelConfigs)
+        {
+            if (IsPanelOrChildOpen(config))
+            {
+                anyPanelOpen = true;
+                break;
+            }
+        }
+
+        if (dotObject != null && eKeyIcon != null)
+        {
+            // Если открыта панель, скрываем иконку
+            eKeyIcon.SetActive(!anyPanelOpen);
+            dotObject.SetActive(!anyPanelOpen);
+        }
+    }
+
+    // Рекурсивный метод для проверки, открыта ли панель или ее дочерняя
+    private bool IsPanelOrChildOpen(PanelConfig config)
+    {
+        if (config.panelObject != null && config.panelObject.activeSelf)
+            return true;
+
+        foreach (var child in config.childPanels)
+        {
+            if (IsPanelOrChildOpen(child))
+                return true;
+        }
+        return false;
+    }
+
 
     // Остальной код UIManager без изменений...
     private void CachePanels()
@@ -131,7 +169,10 @@ public class UIManager : MonoBehaviour, IUIManager
                         return;
                     }
                 }
-                CloseCurrentPanel();
+                if (InventorySlot.returnEscape() == false)
+                {
+                    CloseCurrentPanel();
+                }
             }
             else
             {
@@ -176,6 +217,7 @@ public class UIManager : MonoBehaviour, IUIManager
                 SetGamePaused(true);
                 UpdateSkillComponentsState();
                 UpdateScriptStates(panelType);
+                UpdateDotVisibility();  // <--- вызов
             }
             else
             {
@@ -203,6 +245,7 @@ public class UIManager : MonoBehaviour, IUIManager
             SetGamePaused(false);
             UpdateSkillComponentsState();
             UpdateScriptStates(null);
+            UpdateDotVisibility();  // <--- вызов
         }
     }
 
@@ -219,6 +262,7 @@ public class UIManager : MonoBehaviour, IUIManager
         }
         UpdateSkillComponentsState();
         UpdateScriptStates(null);
+        UpdateDotVisibility();  // <--- вызов
     }
 
     private void HidePanelRecursive(PanelConfig config)

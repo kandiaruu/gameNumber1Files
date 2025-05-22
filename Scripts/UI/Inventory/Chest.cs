@@ -1,20 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
-
-public class Chest : MonoBehaviour
+public enum ChestSize
 {
+    Small,
+    Large
+}
+public class Chest : MonoBehaviour
+
+{
+    public ChestSize size = ChestSize.Small; 
     public List<ChestItemEntry> chestItems = new List<ChestItemEntry>();
     public void Interact(InventoryPanel inventoryPanel)
     {
         inventoryPanel.LoadChestItems(chestItems);
     }
 
+    public int GetSlotsCount() => size == ChestSize.Small ? 12 : 24;
+
     public void SaveChestItems(List<ChestItemEntry> entries)
     {
         chestItems = new List<ChestItemEntry>(entries); // просто копируем список
     }
 
-    public void FillRandomly(int slotsCount = 12)
+    public void FillRandomly(int slotsCount)
     {
         chestItems.Clear();
         for (int i = 0; i < slotsCount; i++)
@@ -40,6 +48,6 @@ public class Chest : MonoBehaviour
 
     void Start()
     {
-        FillRandomly(slotsCount: 12); // или нужное количество слотов
+        FillRandomly(GetSlotsCount()); // или нужное количество слотов
     }
 }

@@ -15,7 +15,7 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     [SerializeField] private Image frameImage;
     [SerializeField] private Image realbackgroundImage;
     [SerializeField] private TMP_Text stackText;
-    [SerializeField] private InventoryPanel inventoryPanel;
+    public InventoryPanel inventoryPanel;
     private Item item;
     private static InventorySlot heldSlot;
     private static Item heldItem;
@@ -38,7 +38,7 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     private Color greenBackgroundColor = new Color(94f / 255f, 156f / 255f, 110f / 255f, 150f/255f);
     private Color redBackgroundColor = new Color(184f / 255f, 80f / 255f, 80f / 255f, 150f/255f);
     private Color blueBackgroundColor = new Color(86f / 255f, 142f / 255f, 198f / 255f, 83f/255f);
-    private Color yellowBackgroundColor = new Color(252f/255f, 245f/255f, 95f/255f,140f/255f); // Прозрачный белый цвет
+    private Color yellowBackgroundColor = new Color(255f/255f, 192f/255f, 0f/255f, 150f/255f); // Прозрачный белый цвет
     private bool shiftPressed;
     private bool fPressed;
     private float shiftPressTime;
@@ -66,19 +66,19 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     private static bool LKMraztagivanie = false;
     private static bool CanRaztagivanie = false;
     private static InventorySlot realHoveredSlot;
-    private bool canSwap = false;
-
+    private bool canSwap = true;
+    private static string searchInput = "";
+    private static bool searchActive = false;
+    public static bool isSearchMode = false;
+    public bool isYellow = false;
+    public static bool isEscape = false;
+    static bool isSearchLocked = false;
     private void Awake()
     {
         DependencyContainer1.InjectDependencies(this);
         if (itemImage == null || backgroundImage == null || progressBorderImage == null || stackText == null)
         {
             Debug.LogError("Один из компонентов не назначен для слота инвентаря!");
-        }
-
-        if (inventoryPanel == null)
-        {
-            Debug.LogError("InventoryPanel не назначен для слота!");
         }
 
         backgroundImage.enabled = true;
@@ -104,6 +104,14 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         progressBorderImage.fillAmount = 0f;
 
         DependencyContainer1.InjectDependencies(this);
+    }
+
+    private void Start()
+    {
+        if (inventoryPanel == null)
+        {
+            Debug.LogError("InventoryPanel не назначен для слота!");
+        }
     }
 
     private void Update()
@@ -219,7 +227,6 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
                 ClearHeldItem();
             }
         }
-
         HandleItemCountInput(); // добавим вызов метода ниже
         if (isHoldingLeftClick && !hasTriedDropAfterHold)
         {
@@ -244,7 +251,7 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
             );
             heldIcon.GetComponent<RectTransform>().anchoredPosition = localPoint + new Vector2(10, -10);
         }
-        
+
         if (item != null && isCursorInSlot && heldItem == null)
         {
             frameImage.enabled = true;
@@ -253,7 +260,6 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         {
             frameImage.enabled = false;
         }
-
         if (heldItem != null && (item == null || item.id == heldItem.id) && isCursorInSlot && !isIllusion)
         {
             realbackgroundImage.enabled = true;
@@ -263,6 +269,11 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         {
             realbackgroundImage.enabled = true;
             realbackgroundImage.color = redBackgroundColor;
+        }
+        else if (isYellow && item != null)
+        {
+            realbackgroundImage.enabled = true;
+            realbackgroundImage.color = yellowBackgroundColor;
         }
         else if (item != null)
         {
@@ -274,117 +285,262 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
             realbackgroundImage.enabled = false;
         }
 
-    if (item != null && item.isModifiable && !isIllusion) 
-    {
-        if (isCursorInSlot && heldItem == null)
+        if (item != null && item.isModifiable && !isIllusion)
         {
-            if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
+            if (isCursorInSlot && heldItem == null)
             {
-                shiftPressed = true;
-                shiftPressTime = Time.unscaledTime;
-            }
-
-            // Мгновенное открытие панели при Shift+ПКМ
-            if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) && Input.GetMouseButtonDown(1))
-            {
-                itemInfoManager?.ShowItemInfo(item);
-                shiftPressed = false;
-                fPressed = false;
-            }
-            // Основная логика удержания ПКМ без Shift
-            else if (Input.GetMouseButton(1) && !Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift))
-            {
-                rightClickHoldDelay += Time.unscaledDeltaTime;
-
-                if (rightClickHoldDelay >= HOLD_THRESHOLD)
+                if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
                 {
-                    fPressed = true;
-                    fPressTime = Time.unscaledTime;
-
-                    fHoldTime += Time.unscaledDeltaTime;
-
-                    progressBorderImage.enabled = true;
-                    progressBorderImage.fillAmount = fHoldTime / F_HOLD_THRESHOLD;
-
-                    if (fHoldTime >= F_HOLD_THRESHOLD)
-                    {
-                        itemInfoManager?.ShowItemInfo(item);
-                        ResetFInteraction();
-                        rightClickHoldDelay = 0f;
-                    }
+                    shiftPressed = true;
+                    shiftPressTime = Time.unscaledTime;
                 }
-            }
-            else
-            {
-                ResetFInteraction();
-                rightClickHoldDelay = 0f;
-            }
 
-            if (shiftPressed && fPressed)
-            {
-                if (Mathf.Abs(shiftPressTime - fPressTime) <= COMBO_WINDOW)
+                // Мгновенное открытие панели при Shift+ПКМ
+                if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) && Input.GetMouseButtonDown(1))
                 {
                     itemInfoManager?.ShowItemInfo(item);
+                    shiftPressed = false;
+                    fPressed = false;
+                }
+                // Основная логика удержания ПКМ без Shift
+                else if (Input.GetMouseButton(1) && !Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift))
+                {
+                    rightClickHoldDelay += Time.unscaledDeltaTime;
+
+                    if (rightClickHoldDelay >= HOLD_THRESHOLD)
+                    {
+                        fPressed = true;
+                        fPressTime = Time.unscaledTime;
+
+                        fHoldTime += Time.unscaledDeltaTime;
+
+                        progressBorderImage.enabled = true;
+                        progressBorderImage.fillAmount = fHoldTime / F_HOLD_THRESHOLD;
+
+                        if (fHoldTime >= F_HOLD_THRESHOLD)
+                        {
+                            itemInfoManager?.ShowItemInfo(item);
+                            ResetFInteraction();
+                            rightClickHoldDelay = 0f;
+                        }
+                    }
+                }
+                else
+                {
+                    ResetFInteraction();
+                    rightClickHoldDelay = 0f;
                 }
 
-                shiftPressed = false;
-                fPressed = false;
+                if (shiftPressed && fPressed)
+                {
+                    if (Mathf.Abs(shiftPressTime - fPressTime) <= COMBO_WINDOW)
+                    {
+                        itemInfoManager?.ShowItemInfo(item);
+                    }
+
+                    shiftPressed = false;
+                    fPressed = false;
+                }
+
+                if (shiftPressed && Time.unscaledTime - shiftPressTime > COMBO_WINDOW)
+                    shiftPressed = false;
+
+                if (fPressed && Time.unscaledTime - fPressTime > COMBO_WINDOW)
+                    fPressed = false;
             }
-
-            if (shiftPressed && Time.unscaledTime - shiftPressTime > COMBO_WINDOW)
-                shiftPressed = false;
-
-            if (fPressed && Time.unscaledTime - fPressTime > COMBO_WINDOW)
-                fPressed = false;
-        }   
+        }
+        else
+        {
+            backgroundImage.color = modifiableBorderColor;
+            ResetFInteraction();
+            rightClickHoldDelay = 0f;
+        }
     }
-    else 
+
+    //backgroundImage.color = initialBorderColor;
+    //backgroundImage.color = modifiableBorderColor;
+
+    public static void HandleSlotNameSearch(List<InventorySlot> allSlots)
+{
+    isEscape = isSearchMode;
+
+    // Подсветка слотов по совпадению с поиском
+    foreach (var slot in allSlots)
     {
-        backgroundImage.color = modifiableBorderColor;
-        ResetFInteraction();
-        rightClickHoldDelay = 0f;
+        if (searchActive && searchInput.Length > 0
+            && slot.item != null
+            && slot.item.itemName.IndexOf(searchInput, StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            slot.isYellow = true;
+        }
+        else
+        {
+            slot.isYellow = false;
+        }
+    }
+
+    // Shift + Enter фиксирует ввод
+    if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) &&
+        (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) &&
+        isSearchMode)
+    {
+        isSearchLocked = true;
+        Debug.Log("Search input locked.");
+        return;
+    }
+
+    // Enter без Shift — активация/сброс режима поиска
+    if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+    {
+        if (!isSearchMode)
+        {
+            isSearchMode = true;
+            Debug.Log("Search mode activated.");
+            return;
+        }
+        else
+        {
+            // Повторное нажатие Enter при активном поиске — сброс
+            searchInput = "";
+            isSearchLocked = false;
+            return;
+        }
+    }
+
+    // Если не в режиме поиска — выход
+    if (!isSearchMode) return;
+
+    // Escape — сброс всего
+    if (Input.GetKeyDown(KeyCode.Escape))
+    {
+        searchInput = "";
+        searchActive = false;
+        isSearchMode = false;
+        isSearchLocked = false;
+
+        foreach (var slot in allSlots)
+            slot.realbackgroundImage.enabled = false;
+
+        Debug.Log("Search cancelled via Escape.");
+        return;
+    }
+
+    // Если ввод зафиксирован — блокируем изменения
+    if (isSearchLocked) return;
+
+    // Backspace
+    if (Input.GetKeyDown(KeyCode.Backspace) && searchInput.Length > 0)
+    {
+        searchInput = searchInput.Substring(0, searchInput.Length - 1);
+        searchActive = searchInput.Length > 0;
+    }
+
+    // Ввод латинских букв
+    for (KeyCode k = KeyCode.A; k <= KeyCode.Z; k++)
+    {
+        if (Input.GetKeyDown(k))
+        {
+            char c = k.ToString()[0];
+            if (!Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift))
+                c = Char.ToLower(c);
+
+            searchInput += c;
+            searchActive = true;
+            Debug.Log($"searchInput (char): '{searchInput}'");
+            break;
+        }
     }
 }
-//backgroundImage.color = initialBorderColor;
-//backgroundImage.color = modifiableBorderColor;
-private void HandleItemCountInput()
-{
-    if (Input.GetKeyDown(KeyCode.Escape) || (Input.GetKeyDown(KeyCode.D) && Input.GetKey(KeyCode.LeftShift)) || (Input.GetKeyDown(KeyCode.Backspace) && Input.GetKey(KeyCode.LeftShift)))
+
+    public static bool returnEscape()
     {
-        if (inputSlot != null && heldItem != null)
+        return isEscape;
+    }
+    public static bool getSearchMode()
+    {
+        return isSearchMode;
+    }
+
+    public static bool getSearchLocked()
+    {
+        return isSearchLocked;
+    }
+
+    public static string getSearchInput()
+    {
+        return searchInput;
+    } 
+
+    public static void resetSearchMod()
+    {
+        isSearchMode = false;
+        searchInput = "";
+        searchActive = false;
+    }
+
+    private void HandleItemCountInput()
+    {
+        if (Input.GetKeyDown(KeyCode.Escape) || (Input.GetKeyDown(KeyCode.D) && Input.GetKey(KeyCode.LeftShift)) || (Input.GetKeyDown(KeyCode.Backspace) && Input.GetKey(KeyCode.LeftShift)))
         {
-            ReturnHeldItem();
-        }
-        inputNumber = "";
-        isIllusion = false;
-        return;
-    }
-
-    if ((!isCursorInSlot || item == null) && inputNumber == "" && Deleted)
-    {
-        // Debug.LogWarning($"isCursorInSlot: {isCursorInSlot} item: {item} inputNumber: {inputNumber} Deleted: {Deleted}");
-        return;
-    }
-    // else
-    // {
-    //     Debug.Log($"isCursorInSlot: {isCursorInSlot} item: {item} inputNumber: {inputNumber} Deleted: {Deleted}");
-    // }
-
-    if (inputSlot != null && inputSlot != this)
-    {
-        return;
-    }
-
-    // Обработка Backspace или D
-    if ((Input.GetKeyDown(KeyCode.Backspace) || Input.GetKeyDown(KeyCode.D)) && inputNumber.Length > 0)
-    {
-        inputNumber = inputNumber.Substring(0, inputNumber.Length - 1);
-        if (inputNumber == "")
-        {
-            if (heldItem != null)
+            if (inputSlot != null && heldItem != null)
             {
-                // Если item == null, восстанавливаем его временно из heldItem
-                if (item == null)
+                ReturnHeldItem();
+            }
+            inputNumber = "";
+            isIllusion = false;
+            return;
+        }
+
+        if ((!isCursorInSlot || item == null) && inputNumber == "" && Deleted)
+        {
+            // Debug.LogWarning($"isCursorInSlot: {isCursorInSlot} item: {item} inputNumber: {inputNumber} Deleted: {Deleted}");
+            return;
+        }
+        // else
+        // {
+        //     Debug.Log($"isCursorInSlot: {isCursorInSlot} item: {item} inputNumber: {inputNumber} Deleted: {Deleted}");
+        // }
+
+        if (inputSlot != null && inputSlot != this)
+        {
+            return;
+        }
+
+        // Обработка Backspace или D
+        if ((Input.GetKeyDown(KeyCode.Backspace) || Input.GetKeyDown(KeyCode.D)) && inputNumber.Length > 0)
+        {
+            inputNumber = inputNumber.Substring(0, inputNumber.Length - 1);
+            if (inputNumber == "")
+            {
+                if (heldItem != null)
+                {
+                    // Если item == null, восстанавливаем его временно из heldItem
+                    if (item == null)
+                    {
+                        item = new Item(
+                            heldItem.id,
+                            heldItem.itemName,
+                            heldItem.description,
+                            heldItem.icon,
+                            0,
+                            heldItem.maxStackSize,
+                            heldItem.isModifiable
+                        );
+                        SetItem(item);
+                    }
+
+                    item.AddToStack(heldItem.stackSize);
+                    heldItem.stackSize = 0;
+
+                    isIllusion = true;
+                    SetItem(item);
+                    UpdateHeldIcon();
+                }
+                return;
+            }
+            if (int.TryParse(inputNumber, out int desiredAmount))
+            {
+                if (item == null && heldItem != null && heldSlot == this)
                 {
                     item = new Item(
                         heldItem.id,
@@ -398,179 +554,155 @@ private void HandleItemCountInput()
                     SetItem(item);
                 }
 
-                item.AddToStack(heldItem.stackSize);
-                heldItem.stackSize = 0;
+                int available = (heldItem != null) ? item.stackSize + heldItem.stackSize : item.stackSize;
+                int amountToPick = Mathf.Min(desiredAmount, available);
 
-                isIllusion = true;
-                SetItem(item);
-                UpdateHeldIcon();
-            }
-            return;
-        }
-        if (int.TryParse(inputNumber, out int desiredAmount))
-        {
-            if (item == null && heldItem != null && heldSlot == this)
-            {
-                item = new Item(
-                    heldItem.id,
-                    heldItem.itemName,
-                    heldItem.description,
-                    heldItem.icon,
-                    0,
-                    heldItem.maxStackSize,
-                    heldItem.isModifiable
-                );
-                SetItem(item);
-            }
-
-            int available = (heldItem != null) ? item.stackSize + heldItem.stackSize : item.stackSize;
-            int amountToPick = Mathf.Min(desiredAmount, available);
-
-            if (heldItem != null && heldSlot == this && heldItem.id == item.id)
-            {
-                int newAmount = Mathf.Min(amountToPick, heldItem.maxStackSize);
-                int diff = newAmount - heldItem.stackSize;
-
-                if (diff > 0)
-                {
-                    item.RemoveFromStack(diff);
-                }
-                else if (diff < 0)
-                {
-                    item.AddToStack(-diff);
-                }
-
-                heldItem.stackSize = newAmount;
-
-                if (item.stackSize <= 0)
-                    ClearSlot();
-                else
-                    SetItem(item);
-
-                UpdateHeldIcon();
-            }
-        }
-
-        return;
-    }
-    else if ((Input.GetKeyDown(KeyCode.Backspace) || Input.GetKeyDown(KeyCode.D)) && inputNumber.Length == 0)
-    {
-        if (isIllusion)
-        {
-            Deleted = true;
-            isIllusion = false;
-            heldItem = null;
-            inputSlot = null;
-            Destroy(heldIcon);
-            inputNumber = "";
-            return;
-        }
-        else if (heldItem != null && heldItem.stackSize == 1)
-        {
-            item.AddToStack(1);
-            inputSlot.Deleted = true;
-            inputSlot = null;
-            heldItem = null;
-            Destroy(heldIcon);
-            SetItem(item);
-        }
-    }
-
-
-    // Обработка ввода цифр
-    for (KeyCode key = KeyCode.Alpha0; key <= KeyCode.Alpha9; key++)
-    {
-        if (item == null) {
-            return;
-        }
-
-        if (Input.GetKeyDown(key))
-        {
-            if (isIllusion)
-            {
-                isIllusion = false;
-                heldItem = null;
-                Destroy(heldIcon);
-            }
-
-            if (heldIcon != null)
-            {
-                Image img = heldIcon.GetComponent<Image>();
-                if (img != null)
-                {
-                    Color color = img.color;
-                    color.a = 1f;
-                    img.color = color;
-                }
-            }
-
-            Deleted = false;
-            string digit = key.ToString().Replace("Alpha", "");
-            inputNumber += digit;
-
-            if (!int.TryParse(inputNumber, out int desiredAmount))
-            {
-                inputNumber = "";
-                return;
-            }
-
-            int available = (heldItem != null) ? item.stackSize + heldItem.stackSize : item.stackSize;
-            int amountToPick = Mathf.Min(desiredAmount, available);
-
-            if (amountToPick > 0)
-            {
                 if (heldItem != null && heldSlot == this && heldItem.id == item.id)
                 {
-                    if (inputSlot == null)
-                    {
-                        inputNumber = "";
-                        return;
-                    }
-
                     int newAmount = Mathf.Min(amountToPick, heldItem.maxStackSize);
-                    int amountToAdd = newAmount - heldItem.stackSize;
+                    int diff = newAmount - heldItem.stackSize;
 
-                    if (amountToAdd != 0)
+                    if (diff > 0)
                     {
-                        heldItem.stackSize = newAmount;
-                        item.RemoveFromStack(amountToAdd);
-
-                        if (item.stackSize <= 0)
-                            ClearSlot();
-                        else
-                            SetItem(item);
-
-                        UpdateHeldIcon();
+                        item.RemoveFromStack(diff);
                     }
-                }
-                else if (heldItem == null)
-                {
-                    inputSlot = this;
-                    heldItem = new Item(item.id, item.itemName, item.description, item.icon, amountToPick, item.maxStackSize, item.isModifiable);
-                    heldSlot = this;
+                    else if (diff < 0)
+                    {
+                        item.AddToStack(-diff);
+                    }
 
-                    item.RemoveFromStack(amountToPick);
+                    heldItem.stackSize = newAmount;
 
                     if (item.stackSize <= 0)
                         ClearSlot();
                     else
                         SetItem(item);
 
-                    CreateHeldIcon();
                     UpdateHeldIcon();
                 }
             }
-            else
+
+            return;
+        }
+        else if ((Input.GetKeyDown(KeyCode.Backspace) || Input.GetKeyDown(KeyCode.D)) && inputNumber.Length == 0)
+        {
+            if (isIllusion)
             {
-                inputNumber = "";
                 Deleted = true;
+                isIllusion = false;
+                heldItem = null;
                 inputSlot = null;
+                Destroy(heldIcon);
+                inputNumber = "";
+                return;
+            }
+            else if (heldItem != null && heldItem.stackSize == 1)
+            {
+                item.AddToStack(1);
+                inputSlot.Deleted = true;
+                inputSlot = null;
+                heldItem = null;
+                Destroy(heldIcon);
+                SetItem(item);
+            }
+        }
+
+
+        // Обработка ввода цифр
+        for (KeyCode key = KeyCode.Alpha0; key <= KeyCode.Alpha9; key++)
+        {
+            if (item == null)
+            {
+                return;
             }
 
-            break;
+            if (Input.GetKeyDown(key))
+            {
+                if (isIllusion)
+                {
+                    isIllusion = false;
+                    heldItem = null;
+                    Destroy(heldIcon);
+                }
+
+                if (heldIcon != null)
+                {
+                    Image img = heldIcon.GetComponent<Image>();
+                    if (img != null)
+                    {
+                        Color color = img.color;
+                        color.a = 1f;
+                        img.color = color;
+                    }
+                }
+
+                Deleted = false;
+                string digit = key.ToString().Replace("Alpha", "");
+                inputNumber += digit;
+
+                if (!int.TryParse(inputNumber, out int desiredAmount))
+                {
+                    inputNumber = "";
+                    return;
+                }
+
+                int available = (heldItem != null) ? item.stackSize + heldItem.stackSize : item.stackSize;
+                int amountToPick = Mathf.Min(desiredAmount, available);
+
+                if (amountToPick > 0)
+                {
+                    if (heldItem != null && heldSlot == this && heldItem.id == item.id)
+                    {
+                        if (inputSlot == null)
+                        {
+                            inputNumber = "";
+                            return;
+                        }
+
+                        int newAmount = Mathf.Min(amountToPick, heldItem.maxStackSize);
+                        int amountToAdd = newAmount - heldItem.stackSize;
+
+                        if (amountToAdd != 0)
+                        {
+                            heldItem.stackSize = newAmount;
+                            item.RemoveFromStack(amountToAdd);
+
+                            if (item.stackSize <= 0)
+                                ClearSlot();
+                            else
+                                SetItem(item);
+
+                            UpdateHeldIcon();
+                        }
+                    }
+                    else if (heldItem == null)
+                    {
+                        inputSlot = this;
+                        heldItem = new Item(item.id, item.itemName, item.description, item.icon, amountToPick, item.maxStackSize, item.isModifiable);
+                        heldSlot = this;
+
+                        item.RemoveFromStack(amountToPick);
+
+                        if (item.stackSize <= 0)
+                            ClearSlot();
+                        else
+                            SetItem(item);
+
+                        CreateHeldIcon();
+                        UpdateHeldIcon();
+                    }
+                }
+                else
+                {
+                    inputNumber = "";
+                    Deleted = true;
+                    inputSlot = null;
+                }
+
+                break;
+            }
         }
     }
-}
 
 public bool HasItem()
 {
@@ -927,7 +1059,7 @@ private void TryPlaceHeldItem()
         }
         else
         {
-            Debug.Log("real");
+            Debug.Log("Swap items");
             if (heldItem.stackSize == 0 || !canSwap) return;
             Item temp = item;
             SetItem(heldItem);
@@ -1009,60 +1141,59 @@ private void TryPlaceHeldItem()
         UpdateHeldIcon();
     }
 
-    private void TryMoveToOtherPanel()
+    public void TryMoveToOtherPanel()
     {
-        if (item == null) return; // Нет предмета — ничего не делаем
+        if (item == null) return;
 
         var panels = InventoryPanelsManager.Instance.GetPanelsForDoubleClick()
             .Where(p => p != this.inventoryPanel)
             .ToList();
 
-        if (panels.Count == 0) return; // Нет других панелей
+        if (panels.Count == 0) return;
 
-        // Ищем первый подходящий слот (пустой или совместимый стек)
-        InventorySlot targetSlot = null;
         foreach (var panel in panels)
         {
-            // 1. Сначала ищем существующий стек этого предмета с незаполненным максимальным размером
-            targetSlot = panel.slots.FirstOrDefault(s =>
-                s.item != null &&
-                s.item.id == item.id &&
-                s.item.stackSize < s.item.maxStackSize
-            );
-            if (targetSlot != null) break;
-
-            // 2. Если не нашли — ищем пустой слот
-            targetSlot = panel.slots.FirstOrDefault(s => s.item == null);
-            if (targetSlot != null) break;
-        }
-
-        if (targetSlot == null) return; // Некуда класть
-
-        // Теперь либо добавляем в стек, либо полностью переносим в пустой слот
-        if (targetSlot.item != null && targetSlot.item.id == item.id)
-        {
-            int canMove = Math.Min(item.stackSize, targetSlot.item.maxStackSize - targetSlot.item.stackSize);
-            if (canMove > 0)
+            // Сначала добавляем в существующие стеки
+            foreach (var targetSlot in panel.slots)
             {
-                targetSlot.item.AddToStack(canMove);
-                item.RemoveFromStack(canMove);
-                targetSlot.SetItem(targetSlot.item);
+                if (item == null) break;
 
-                if (item.stackSize <= 0)
+                if (targetSlot.item != null &&
+                    targetSlot.item.id == item.id &&
+                    targetSlot.item.stackSize < targetSlot.item.maxStackSize)
                 {
-                    ClearSlot();
-                }
-                else
-                {
-                    SetItem(item);
+                    int canMove = Mathf.Min(item.stackSize, targetSlot.item.maxStackSize - targetSlot.item.stackSize);
+                    if (canMove > 0)
+                    {
+                        targetSlot.item.AddToStack(canMove);
+                        item.RemoveFromStack(canMove);
+                        targetSlot.SetItem(targetSlot.item);
+
+                        if (item.stackSize <= 0)
+                        {
+                            ClearSlot();
+                            return; // Все предметы перемещены
+                        }
+                        else
+                        {
+                            SetItem(item);
+                        }
+                    }
                 }
             }
-        }
-        else if (targetSlot.item == null)
-        {
-            // Полностью переносим
-            targetSlot.SetItem(item);
-            ClearSlot();
+
+            // Затем кладём остатки в пустые слоты
+            foreach (var targetSlot in panel.slots)
+            {
+                if (item == null) break;
+
+                if (targetSlot.item == null)
+                {
+                    targetSlot.SetItem(item);
+                    ClearSlot();
+                    return; // все предметы перемещены
+                }
+            }
         }
     }
 
