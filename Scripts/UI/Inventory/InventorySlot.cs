@@ -72,6 +72,7 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     public static bool isSearchMode = false;
     public bool isYellow = false;
     public static bool isEscape = false;
+    public static bool isRealEscape = false;
     static bool isSearchLocked = false;
     private void Awake()
     {
@@ -116,6 +117,10 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     private void Update()
     {
+        if (isCursorInSlot && Input.GetKeyDown(KeyCode.C) && item != null)
+        {
+            ClearSlot();
+        }
         if (heldItem == null && isCursorInSlot && item != null && realHoveredSlot != null)
         {
             if (Input.GetMouseButton(0) && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)))
@@ -362,7 +367,7 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     public static void HandleSlotNameSearch(List<InventorySlot> allSlots)
 {
-    isEscape = isSearchMode;
+    isEscape = isSearchMode || isRealEscape;
 
     // Подсветка слотов по совпадению с поиском
     foreach (var slot in allSlots)
@@ -381,28 +386,33 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     // Shift + Enter фиксирует ввод
     if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) &&
-        (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) &&
-        isSearchMode)
+        (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
     {
-        isSearchLocked = true;
-        Debug.Log("Search input locked.");
+        if (isSearchMode)
+        {
+            searchInput = "";
+            isSearchLocked = false;
+            searchActive = false;
+        }
         return;
     }
 
-    // Enter без Shift — активация/сброс режима поиска
+    // Enter без Shift
     if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
     {
         if (!isSearchMode)
         {
             isSearchMode = true;
-            Debug.Log("Search mode activated.");
+            return;
+        }
+        else if (!isSearchLocked)
+        {
+            isSearchLocked = true;
             return;
         }
         else
         {
-            // Повторное нажатие Enter при активном поиске — сброс
-            searchInput = "";
-            isSearchLocked = false;
+            isSearchLocked = false; // Разблокировка для продолжения ввода
             return;
         }
     }
@@ -421,7 +431,6 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         foreach (var slot in allSlots)
             slot.realbackgroundImage.enabled = false;
 
-        Debug.Log("Search cancelled via Escape.");
         return;
     }
 
@@ -446,12 +455,15 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
             searchInput += c;
             searchActive = true;
-            Debug.Log($"searchInput (char): '{searchInput}'");
             break;
         }
     }
 }
 
+    public static void typeRealEscape(bool input)
+    {
+        isRealEscape = input;
+    }
     public static bool returnEscape()
     {
         return isEscape;

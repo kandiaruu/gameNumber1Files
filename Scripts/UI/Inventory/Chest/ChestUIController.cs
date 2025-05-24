@@ -1,15 +1,21 @@
 using UnityEngine;
 using System.Collections.Generic;
+using TMPro;
 
 public class ChestUIController : MonoBehaviour, IChestUIController
 {
     [SerializeField] private GameObject chestTitleText;
     [SerializeField] private GameObject chestSkitGrid;
+    [SerializeField] private GameObject stashTitleText;
+    [SerializeField] private GameObject stashSkitGrid;
     [SerializeField] private GameObject TitleText;
     [SerializeField] private GameObject SkitGrid;
     private RectTransform titleTextRect;
     private RectTransform skitGridRect;
     [SerializeField] private InventoryPanel inventoryPanel; // 💡 Панель инвентаря для сундука
+    [SerializeField] private InventoryPanel stashPanel; // 💡 Панель инвентаря для хранилища
+    [InjectAttribute1] private IStashManager stashManager { get; set; } // Инъекция зависимости для IItemInfoManager
+    private StashData currentStash; // 📦 Активный тайник
     
     private Chest currentChest; // 🗝️ Активный сундук
     private bool isOpen = false;
@@ -42,6 +48,50 @@ public class ChestUIController : MonoBehaviour, IChestUIController
         // 📦 Загружаем предметы сундука в UI
         inventoryPanel.LoadChestItems(currentChest.chestItems);
         InventoryPanelsManager.Instance.RegisterOpenPanel(inventoryPanel);
+    }
+
+    public void OpenStashUI(StashData stash)
+    {
+        if (isOpen)
+        {
+            CloseStashUI(); // если открыт — закроем
+            return;
+        }
+        isOpen = true;
+        currentStash = stash;
+        stashTitleText.SetActive(true);
+        stashSkitGrid.SetActive(true);
+        UpdateStashTitle(); // Обновляем заголовок тайника
+        SetUIPositionLeft(); // Устанавливаем позицию UI влево
+        stashPanel.SetupInventory(stash.stashSlots, stash.stashColumns); // Настройка инвентаря с 24 слотами и 8 колонками
+        stashPanel.LoadChestItems(stash.items);
+        InventoryPanelsManager.Instance.RegisterOpenPanel(stashPanel);
+    }
+
+    public void CloseStashUI()
+    {
+        isOpen = false;
+        stashTitleText.SetActive(false);
+        stashSkitGrid.SetActive(false);
+        SetUIPositionCenter();
+        if (currentStash != null)
+        {
+            currentStash.items = stashPanel.GetCurrentItems();
+        }
+        InventoryPanelsManager.Instance.UnregisterPanel(stashPanel);
+    }
+
+    private void UpdateStashTitle()
+    {
+        if (stashTitleText != null)
+        {
+            int index = stashManager.GetCurrentStashIndex() + 1; // +1 чтобы был Stash 1, Stash 2...
+            var textComponent = stashTitleText.GetComponent<TextMeshProUGUI>();
+            if (textComponent != null)
+            {
+                textComponent.text = $"Stash {index}";
+            }
+        }
     }
 
     public void CloseChestUI()

@@ -6,8 +6,9 @@ public enum InventoryPanelType
 {
     Player,
     Chest,
+    Stash
 }
-public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel
+public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStashPanel
 {
     [SerializeField] private InventoryPanelType panelType;
     public InventoryPanelType PanelType => panelType; // Геттер, если нужен доступ снаружи
@@ -16,6 +17,9 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel
     [SerializeField] private GameObject slotPrefab; // Префаб InventorySlot
     [SerializeField] private Transform slotsParent; // GridLayoutGroup (куда добавлять слоты)
     [SerializeField] private GridLayoutGroup grid;
+    [InjectAttribute1] private IChestUIController chestcontroller { get; set; } // Инъекция зависимости для IStashPanel
+    [InjectAttribute1] private IInventoryPanelsManager inventoryPanelsManager { get; set; } // Инъекция зависимости для IInventoryPanelsManager
+    [InjectAttribute1] private IStashManager stashManager { get; set; } // Инъекция зависимости для IItemInfoManager
 
     private void Awake()
     {
@@ -62,6 +66,14 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel
         {
             if (!InventorySlot.getSearchMode() || InventorySlot.getSearchLocked())
             {
+                if (inventoryPanelsManager.OpenPanels.Count == 0)
+                {
+                    // InventorySlot.typeRealEscape(false);
+                    if (Input.GetKeyDown(KeyCode.S))
+                    {
+                        OpenStashPanel();
+                    }
+                }
                 if (Input.GetKeyDown(KeyCode.F))
                 {
                     FilterItemsByStackSize();
@@ -96,7 +108,7 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel
                 if (testItem != null) slots[2].SetItem(testItem);
             }
         }
-        else if (panelType == InventoryPanelType.Chest)
+        if (panelType == InventoryPanelType.Chest || panelType == InventoryPanelType.Stash)
         {
             if (!InventorySlot.getSearchMode() || InventorySlot.getSearchLocked())
             {
@@ -110,6 +122,58 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel
                 }
             }
         }
+        if (panelType == InventoryPanelType.Stash)
+        {
+            // InventorySlot.typeRealEscape(true);
+            if (!InventorySlot.getSearchMode() || InventorySlot.getSearchLocked())
+            {
+                if (Input.GetKeyDown(KeyCode.E))
+                {
+                    SwitchStashNext();
+                }
+                if (Input.GetKeyDown(KeyCode.Q))
+                {
+                    SwitchStashPrev();
+                }
+                if (Input.GetKeyDown(KeyCode.S))
+                {
+                    OpenStashPanel();
+                }
+                // Закрытие stash панели (например Escape)
+                if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    chestcontroller.CloseStashUI();
+                }
+            }
+        }
+    }
+
+    private void OpenStashPanel()
+    {
+        var stash = stashManager.GetCurrentStash();
+        chestcontroller.OpenStashUI(stash);
+    }
+
+    private void SwitchStashNext()
+    {
+        // Сохраняем текущий stash
+        var stash = stashManager.GetCurrentStash();
+        chestcontroller.OpenStashUI(stash);
+
+        // Переключаемся на следующий
+        stashManager.NextStash();
+        stash = stashManager.GetCurrentStash();
+        chestcontroller.OpenStashUI(stash);
+    }
+
+    private void SwitchStashPrev()
+    {
+        var stash = stashManager.GetCurrentStash();
+        chestcontroller.OpenStashUI(stash);
+
+        stashManager.PrevStash();
+        stash = stashManager.GetCurrentStash();
+        chestcontroller.OpenStashUI(stash);
     }
 
     public void TryMoveMatchingItemsToOtherPanel()

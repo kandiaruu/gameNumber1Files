@@ -17,6 +17,7 @@ public class Inventory : BasePanel, IInventory
     {
         base.Close(); // Вызываем базовый метод, чтобы панель стала активной
         chestUIController.CloseChestUI(); // Закрываем UI сундука, если он открыт
+        chestUIController.CloseStashUI();
         InventorySlot.resetSearchMod(); // Сбрасываем режим поиска
         InventorySlot.ReturnHeldItem(); // Возвращаем удерживаемый предмет в инвентарь
         tooltipManager.HideTooltip(); // Скрываем тултип, если он открыт

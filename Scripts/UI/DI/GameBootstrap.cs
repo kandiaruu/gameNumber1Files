@@ -59,6 +59,12 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private InventoryPanel inventoryPanel;
     [Dependency(new[] { typeof(IChestPanel) }, typeof(InventoryPanel), Lifecycle.Singleton)]
     [SerializeField] private InventoryPanel chestPanel;
+    [Dependency(new[] { typeof(IStashPanel) }, typeof(InventoryPanel), Lifecycle.Singleton)]
+    [SerializeField] private InventoryPanel stashPanel;
+    [Dependency(new[] { typeof(IInventoryPanelsManager) }, typeof(InventoryPanelsManager), Lifecycle.Singleton)]
+    [SerializeField] private InventoryPanelsManager panelsManager;
+    [Dependency(new[] { typeof(IStashManager) }, typeof(StashManager), Lifecycle.Singleton)]
+    [SerializeField] private StashManager stashManager;
 
     [Dependency(new[] { typeof(IThirdPersonCharacter) }, typeof(ThirdPersonCharacter), Lifecycle.Singleton, typeof(IUIManager), typeof(IChestUIController))]
     [SerializeField] private ThirdPersonCharacter thirdPersonCharacter;

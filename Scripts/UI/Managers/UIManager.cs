@@ -75,7 +75,6 @@ public class UIManager : MonoBehaviour, IUIManager
     {
         // Проверяем, есть ли открытые панели
         bool anyPanelOpen = false;
-
         foreach (var config in panelConfigs)
         {
             if (IsPanelOrChildOpen(config))
@@ -97,13 +96,15 @@ public class UIManager : MonoBehaviour, IUIManager
     private bool IsPanelOrChildOpen(PanelConfig config)
     {
         if (config.panelObject != null && config.panelObject.activeSelf)
-            return true;
-
-        foreach (var child in config.childPanels)
         {
-            if (IsPanelOrChildOpen(child))
-                return true;
+            return true;
         }
+
+        // foreach (var child in config.childPanels)
+        // {
+        //     if (IsPanelOrChildOpen(child))
+        //         return true;
+        // }
         return false;
     }
 
@@ -172,6 +173,10 @@ public class UIManager : MonoBehaviour, IUIManager
                 if (InventorySlot.returnEscape() == false)
                 {
                     CloseCurrentPanel();
+                }
+                else
+                {
+                    Debug.Log("Escape не сработал, так как активна панель инвентаря");
                 }
             }
             else
