@@ -9,9 +9,11 @@ public class Item
     public Sprite icon;
     public int stackSize;
     public int maxStackSize;
-    public bool isModifiable; // ← новое поле
+    public bool isModifiable;
+    public bool isRecipe;                // новое поле
+    public int recipeUsesLeft;          // новое поле (null или -1 = бесконечный)
 
-    public Item(int id, string name, string description, Sprite icon, int stackSize, int maxStackSize, bool isModifiable = false)
+    public Item(int id, string name, string description, Sprite icon, int stackSize, int maxStackSize, bool isModifiable = false, bool isRecipe = false, int recipeUsesLeft = -1)
     {
         this.id = id;
         this.itemName = name;
@@ -20,6 +22,8 @@ public class Item
         this.stackSize = stackSize;
         this.maxStackSize = maxStackSize;
         this.isModifiable = isModifiable;
+        this.isRecipe = isRecipe;
+        this.recipeUsesLeft = recipeUsesLeft;
     }
 
     public bool CanAddToStack(int amount)

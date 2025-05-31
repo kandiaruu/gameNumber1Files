@@ -12,6 +12,8 @@ public class ItemDatabase : ScriptableObject
         public Sprite icon;
         public int maxStackSize;
         public bool isModifiable; // ← новое поле
+        public bool isRecipe;                // новое поле
+        public int recipeUsesLeft;          // новое поле (null или -1 = бесконечный)
     }
 
     public ItemData[] items;
@@ -29,7 +31,9 @@ public class ItemDatabase : ScriptableObject
                     itemData.icon,
                     stackSize,
                     itemData.maxStackSize,
-                    itemData.isModifiable
+                    itemData.isModifiable,
+                    itemData.isRecipe,
+                    itemData.recipeUsesLeft
                 );
             }
         }

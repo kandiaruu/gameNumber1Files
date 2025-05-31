@@ -25,6 +25,7 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     private static InventorySlot hoveredSlot;
     [InjectAttribute1] private IItemInfoManager itemInfoManager { get; set; }
     [InjectAttribute1] private ITooltipManager tooltipManager { get; set; } // Добавляем инъекцию TooltipManager
+    [InjectAttribute1] private IChestUIController chestUIController { get; set; }
     private float lastClickTime;
     private float itemPickupTime = -1f;
     private const float DOUBLE_CLICK_THRESHOLD = 0.3f;
@@ -117,10 +118,10 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     private void Update()
     {
-        if (isCursorInSlot && Input.GetKeyDown(KeyCode.C) && item != null)
-        {
-            ClearSlot();
-        }
+        // if (isCursorInSlot && Input.GetKeyDown(KeyCode.C) && item != null)
+        // {
+        //     ClearSlot();
+        // }
         if (heldItem == null && isCursorInSlot && item != null && realHoveredSlot != null)
         {
             if (Input.GetMouseButton(0) && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)))
@@ -202,7 +203,9 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
                                 heldItem.icon,
                                 amountPerSlot,
                                 heldItem.maxStackSize,
-                                heldItem.isModifiable
+                                heldItem.isModifiable,
+                                heldItem.isRecipe,
+                                heldItem.recipeUsesLeft
                             );
                             slot.SetItem(newItem);
                         }
@@ -536,7 +539,9 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
                             heldItem.icon,
                             0,
                             heldItem.maxStackSize,
-                            heldItem.isModifiable
+                            heldItem.isModifiable,
+                            heldItem.isRecipe,
+                            heldItem.recipeUsesLeft
                         );
                         SetItem(item);
                     }
@@ -561,7 +566,9 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
                         heldItem.icon,
                         0,
                         heldItem.maxStackSize,
-                        heldItem.isModifiable
+                        heldItem.isModifiable,
+                        heldItem.isRecipe,
+                        heldItem.recipeUsesLeft
                     );
                     SetItem(item);
                 }
@@ -690,7 +697,7 @@ public class InventorySlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
                     else if (heldItem == null)
                     {
                         inputSlot = this;
-                        heldItem = new Item(item.id, item.itemName, item.description, item.icon, amountToPick, item.maxStackSize, item.isModifiable);
+                        heldItem = new Item(item.id, item.itemName, item.description, item.icon, amountToPick, item.maxStackSize, item.isModifiable, item.isRecipe, item.recipeUsesLeft);
                         heldSlot = this;
 
                         item.RemoveFromStack(amountToPick);
@@ -744,6 +751,7 @@ public Item GetItem()
             Debug.Log(123);
             ClearSlot();
         }
+        chestUIController?.UpdateCraftingUI(); // Обновляем UI крафта, если есть
     }
 
     public void ClearSlot()
@@ -766,7 +774,7 @@ public void OnScroll(PointerEventData eventData)
 
         if (heldItem == null && item.stackSize > 0)
         {
-            heldItem = new Item(item.id, item.itemName, item.description, item.icon, 1, item.maxStackSize, item.isModifiable);
+            heldItem = new Item(item.id, item.itemName, item.description, item.icon, 1, item.maxStackSize, item.isModifiable, item.isRecipe, item.recipeUsesLeft);
             heldSlot = this;
             item.RemoveFromStack(1);
 
@@ -828,7 +836,7 @@ public void OnPointerDown(PointerEventData eventData)
             if (item != null && heldItem == null)
             {
                 LKMstart = true;
-                heldItem = new Item(item.id, item.itemName, item.description, item.icon, item.stackSize, item.maxStackSize, item.isModifiable);
+                heldItem = new Item(item.id, item.itemName, item.description, item.icon, item.stackSize, item.maxStackSize, item.isModifiable, item.isRecipe, item.recipeUsesLeft);
                 heldSlot = this;
                 ClearSlot();
                 CreateHeldIcon();
@@ -910,7 +918,7 @@ public void OnPointerUp(PointerEventData eventData)
             creatingRClicked = true;
             // Создаём heldItem для быстрого клика (менее 0.2 секунд)
             int amountToPick = Mathf.CeilToInt(item.stackSize / 2f);
-            heldItem = new Item(item.id, item.itemName, item.description, item.icon, amountToPick, item.maxStackSize, item.isModifiable);
+            heldItem = new Item(item.id, item.itemName, item.description, item.icon, amountToPick, item.maxStackSize, item.isModifiable, item.isRecipe, item.recipeUsesLeft);
             item.RemoveFromStack(amountToPick);
             heldSlot = this;
 
@@ -1032,6 +1040,7 @@ private void TryPlaceHeldItem()
             string content = $"Предмет: {item.itemName}\n" +
                            $"Описание: {item.description}\n" +
                            $"Количество: {item.stackSize}/{item.maxStackSize}" +
+                            (item.isRecipe ? $"\nИспользований рецепта: {item.recipeUsesLeft}" : "") +
                            (item.isModifiable ? "\nМодифицируемый: Да" : "");
             tooltipManager.ShowTooltip(content, Input.mousePosition);
         }
@@ -1046,7 +1055,7 @@ private void TryPlaceHeldItem()
 
         if (heldItem == null)
         {
-            heldItem = new Item(item.id, item.itemName, item.description, item.icon, item.stackSize, item.maxStackSize, item.isModifiable);
+            heldItem = new Item(item.id, item.itemName, item.description, item.icon, item.stackSize, item.maxStackSize, item.isModifiable, item.isRecipe, item.recipeUsesLeft);
             heldSlot = this;
             ClearSlot();
             CreateHeldIcon();
@@ -1071,7 +1080,6 @@ private void TryPlaceHeldItem()
         }
         else
         {
-            Debug.Log("Swap items");
             if (heldItem.stackSize == 0 || !canSwap) return;
             Item temp = item;
             SetItem(heldItem);
@@ -1089,7 +1097,7 @@ private void TryPlaceHeldItem()
 
         if (item == null)
         {
-            Item newItem = new Item(heldItem.id, heldItem.itemName, heldItem.description, heldItem.icon, 1, heldItem.maxStackSize, heldItem.isModifiable);
+            Item newItem = new Item(heldItem.id, heldItem.itemName, heldItem.description, heldItem.icon, 1, heldItem.maxStackSize, heldItem.isModifiable, heldItem.isRecipe, heldItem.recipeUsesLeft);
             SetItem(newItem);
             heldItem.RemoveFromStack(1);
             UpdateHeldIcon();
@@ -1115,12 +1123,11 @@ private void TryPlaceHeldItem()
     {
         if (heldItem == null)
             return;
-
         var panels = InventoryPanelsManager.Instance.GetPanelsForDoubleClick();
-
         foreach (var panel in panels)
         {
             int remainingToFill = heldItem.maxStackSize - heldItem.stackSize;
+            Debug.Log($"Double click on {item.itemName}. Remaining to fill: {remainingToFill}");
             if (remainingToFill <= 0)
                 continue;
 

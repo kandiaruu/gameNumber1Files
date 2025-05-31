@@ -5,4 +5,8 @@ public interface IChestUIController
     void SetUIPositionCenter();
     void OpenStashUI(StashData stash);
     void CloseStashUI();
+    void OpenCraftingUI();
+    void CloseCraftingUI();
+    void UpdateCraftingUI();
+    InventoryPanel returnChestPanel();
 }

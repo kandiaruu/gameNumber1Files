@@ -28,4 +28,9 @@ public class StashManager : MonoBehaviour, IStashManager
     {
         return currentStashIndex;
     }
+
+    public List<StashData> GetAllStashes()
+    {
+        return stashes;
+    }
 }

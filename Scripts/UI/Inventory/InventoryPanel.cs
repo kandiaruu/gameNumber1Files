@@ -2,17 +2,20 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine.UIElements;
 public enum InventoryPanelType
 {
     Player,
     Chest,
-    Stash
+    Stash,
+    Crafting
 }
 public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStashPanel
 {
     [SerializeField] private InventoryPanelType panelType;
     public InventoryPanelType PanelType => panelType; // Геттер, если нужен доступ снаружи
     [SerializeField] public List<InventorySlot> slots = new List<InventorySlot>();
+    [SerializeField] public List<CraftingSlot> craftingSlots = new List<CraftingSlot>();
     [SerializeField] private ItemDatabase itemDatabase; // Ссылка на базу данных предметов
     [SerializeField] private GameObject slotPrefab; // Префаб InventorySlot
     [SerializeField] private Transform slotsParent; // GridLayoutGroup (куда добавлять слоты)
@@ -20,6 +23,7 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
     [InjectAttribute1] private IChestUIController chestcontroller { get; set; } // Инъекция зависимости для IStashPanel
     [InjectAttribute1] private IInventoryPanelsManager inventoryPanelsManager { get; set; } // Инъекция зависимости для IInventoryPanelsManager
     [InjectAttribute1] private IStashManager stashManager { get; set; } // Инъекция зависимости для IItemInfoManager
+    [SerializeField] private CraftingDatabase craftingDatabase; // Ссылка на базу данных крафта
 
     private void Awake()
     {
@@ -28,21 +32,48 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
 
     public void SetSlotCount(int count)
     {
-        // Удаляем лишние слоты
-        while (slots.Count > count)
+        // Очищаем старые слоты
+        if (panelType == InventoryPanelType.Crafting)
         {
-            var slot = slots[slots.Count - 1];
-            slots.RemoveAt(slots.Count - 1);
-            Destroy(slot.gameObject);
+            // Удаляем лишние CraftingSlot
+            while (craftingSlots.Count > count)
+            {
+                var slot = craftingSlots[craftingSlots.Count - 1];
+                craftingSlots.RemoveAt(craftingSlots.Count - 1);
+                Destroy(slot.gameObject);
+            }
         }
-        // Добавляем недостающие слоты
-        while (slots.Count < count)
+        else
         {
-            GameObject slotObj = Instantiate(slotPrefab, slotsParent);
-            slotObj.name = $"Slot {slots.Count + 1}";
-            InventorySlot slot = slotObj.GetComponent<InventorySlot>();
-            slot.inventoryPanel = this;
-            slots.Add(slot);
+            // Удаляем лишние InventorySlot
+            while (slots.Count > count)
+            {
+                var slot = slots[slots.Count - 1];
+                slots.RemoveAt(slots.Count - 1);
+                Destroy(slot.gameObject);
+            }
+        }
+
+        // Добавляем недостающие слоты
+        while ((panelType == InventoryPanelType.Crafting ? craftingSlots.Count : slots.Count) < count)
+        {
+            GameObject slotObj;
+            if (panelType == InventoryPanelType.Crafting)
+            {
+                slotObj = Instantiate(slotPrefab, slotsParent);
+                slotObj.name = $"CraftingSlot {craftingSlots.Count + 1}";
+                var slot = slotObj.GetComponent<CraftingSlot>();
+                slot.inventoryPanel = this;
+                craftingSlots.Add(slot);
+            }
+            else
+            {
+                slotObj = Instantiate(slotPrefab, slotsParent);
+                slotObj.name = $"Slot {slots.Count + 1}";
+                var slot = slotObj.GetComponent<InventorySlot>();
+                slot.inventoryPanel = this;
+                slots.Add(slot);
+            }
         }
     }
 
@@ -66,12 +97,15 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
         {
             if (!InventorySlot.getSearchMode() || InventorySlot.getSearchLocked())
             {
-                if (inventoryPanelsManager.OpenPanels.Count == 0)
+                if (!inventoryPanelsManager.OpenPanels.Contains(chestcontroller.returnChestPanel()))
                 {
-                    // InventorySlot.typeRealEscape(false);
                     if (Input.GetKeyDown(KeyCode.S))
                     {
                         OpenStashPanel();
+                    }
+                    if (Input.GetKeyDown(KeyCode.C))
+                    {
+                        chestcontroller.OpenCraftingUI();
                     }
                 }
                 if (Input.GetKeyDown(KeyCode.F))
@@ -92,20 +126,99 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
                 }
             }
             // Тестовые клавиши для добавления предметов
-            if (Input.GetKeyDown(KeyCode.Alpha7) && slots.Count > 0)
+            if (Input.GetKeyDown(KeyCode.Alpha1) && slots.Count > 0)
             {
-                Item testItem = itemDatabase.GetItemById(0, 63); // Предмет с ID 1, стек 3
-                if (testItem != null) slots[0].SetItem(testItem);
+                int recipeItemId = 4;
+                int stackSize = 1;
+
+                // Найти CraftRecipe, где recipeItemId совпадает
+                CraftRecipe foundRecipe = craftingDatabase.recipes.FirstOrDefault(r => r.recipeItemId == recipeItemId);
+
+                int recipeUsesLeft = -1;
+                bool isRecipe = false;
+                if (foundRecipe != null && foundRecipe.requiresRecipe)
+                {
+                    isRecipe = true;
+                    if (!foundRecipe.isInfinite)
+                    {
+                        recipeUsesLeft = foundRecipe.craftLimit;
+                    }
+                }
+
+                // Получаем данные из базы предметов
+                var itemData = itemDatabase.items.FirstOrDefault(i => i.id == recipeItemId);
+                if (itemData != null)
+                {
+                    Item testItem = new Item(
+                        itemData.id,
+                        itemData.itemName,
+                        itemData.description,
+                        itemData.icon,
+                        stackSize,
+                        itemData.maxStackSize,
+                        itemData.isModifiable,
+                        isRecipe,
+                        recipeUsesLeft
+                    );
+                    slots[0].SetItem(testItem);
+                }
             }
-            if (Input.GetKeyDown(KeyCode.Alpha8) && slots.Count > 0)
+            if (Input.GetKeyDown(KeyCode.Alpha5) && slots.Count > 0)
             {
-                Item testItem = itemDatabase.GetItemById(2, 5); // Предмет с ID 2, стек 1
+                int recipeItemId = 5;
+                int stackSize = 1;
+
+                // Найти CraftRecipe, где recipeItemId совпадает
+                CraftRecipe foundRecipe = craftingDatabase.recipes.FirstOrDefault(r => r.recipeItemId == recipeItemId);
+
+                int recipeUsesLeft = -1;
+                bool isRecipe = false;
+                if (foundRecipe != null && foundRecipe.requiresRecipe)
+                {
+                    isRecipe = true;
+                    if (!foundRecipe.isInfinite)
+                    {
+                        recipeUsesLeft = foundRecipe.craftLimit;
+                    }
+                }
+
+                // Получаем данные из базы предметов
+                var itemData = itemDatabase.items.FirstOrDefault(i => i.id == recipeItemId);
+                if (itemData != null)
+                {
+                    Item testItem = new Item(
+                        itemData.id,
+                        itemData.itemName,
+                        itemData.description,
+                        itemData.icon,
+                        stackSize,
+                        itemData.maxStackSize,
+                        itemData.isModifiable,
+                        isRecipe,
+                        recipeUsesLeft
+                    );
+                    slots[4].SetItem(testItem);
+                }
+            }
+            if (Input.GetKeyDown(KeyCode.Alpha2) && slots.Count > 0)
+            {
+                Item testItem = itemDatabase.GetItemById(7, 2); // Предмет с ID 1, стек 3
                 if (testItem != null) slots[1].SetItem(testItem);
             }
-            if (Input.GetKeyDown(KeyCode.Alpha9) && slots.Count > 0)
+            if (Input.GetKeyDown(KeyCode.Alpha3) && slots.Count > 0)
             {
-                Item testItem = itemDatabase.GetItemById(3, 2); // Предмет с ID 3, стек 2
+                Item testItem = itemDatabase.GetItemById(8, 2); // Предмет с ID 2, стек 1
                 if (testItem != null) slots[2].SetItem(testItem);
+            }
+            if (Input.GetKeyDown(KeyCode.Alpha4) && slots.Count > 0)
+            {
+                Item testItem = itemDatabase.GetItemById(6, 2); // Предмет с ID 3, стек 2
+                if (testItem != null) slots[3].SetItem(testItem);
+            }
+            if (Input.GetKeyDown(KeyCode.Alpha6) && slots.Count > 0)
+            {
+                Item testItem = itemDatabase.GetItemById(9, 2); // Предмет с ID 3, стек 2
+                if (testItem != null) slots[5].SetItem(testItem);
             }
         }
         if (panelType == InventoryPanelType.Chest || panelType == InventoryPanelType.Stash)
@@ -135,10 +248,6 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
                 {
                     SwitchStashPrev();
                 }
-                if (Input.GetKeyDown(KeyCode.S))
-                {
-                    OpenStashPanel();
-                }
                 // Закрытие stash панели (например Escape)
                 if (Input.GetKeyDown(KeyCode.Escape))
                 {
@@ -146,6 +255,11 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
                 }
             }
         }
+    }
+
+    public List<InventorySlot> returnSlots()
+    {
+        return slots;
     }
 
     private void OpenStashPanel()
@@ -358,6 +472,10 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
         {
             slot.resetCursorInSlot();
         }
+        foreach (var craftingSlot in craftingSlots)
+        {
+            craftingSlot.resetCursorInSlot();
+        }
     }
 
     public void LoadChestItems(List<ChestItemEntry> chestItems)
@@ -366,7 +484,22 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
         {
             if (entry.slotIndex >= 0 && entry.slotIndex < slots.Count)
             {
-                Item item = itemDatabase.GetItemById(entry.itemId, entry.stackSize);
+                // Получаем шаблон предмета
+                Item itemData = itemDatabase.GetItemById(entry.itemId, entry.stackSize);
+
+                // Создаём новый Item с recipeUsesLeft из entry
+                Item item = new Item(
+                    itemData.id,
+                    itemData.itemName,
+                    itemData.description,
+                    itemData.icon,
+                    entry.stackSize,
+                    itemData.maxStackSize,
+                    itemData.isModifiable,
+                    itemData.isRecipe,
+                    entry.recipeUsesLeft // << ВАЖНО: передаём текущее usesLeft
+                );
+
                 slots[entry.slotIndex].SetItem(item);
             }
         }
@@ -395,7 +528,8 @@ public class InventoryPanel : MonoBehaviour, IInventoryPanel, IChestPanel, IStas
                 {
                     slotIndex = i,
                     itemId = item.id,          // ✅ Используем только ID
-                    stackSize = item.stackSize // ✅ И текущее количество
+                    stackSize = item.stackSize, // ✅ И текущее количество
+                    recipeUsesLeft = item.recipeUsesLeft // ✅ Не нужно, если не требуется
                 };
 
                 currentEntries.Add(entry);

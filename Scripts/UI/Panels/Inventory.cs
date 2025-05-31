@@ -18,8 +18,10 @@ public class Inventory : BasePanel, IInventory
         base.Close(); // Вызываем базовый метод, чтобы панель стала активной
         chestUIController.CloseChestUI(); // Закрываем UI сундука, если он открыт
         chestUIController.CloseStashUI();
+        chestUIController.CloseCraftingUI(); // Закрываем UI крафта, если он открыт
         InventorySlot.resetSearchMod(); // Сбрасываем режим поиска
         InventorySlot.ReturnHeldItem(); // Возвращаем удерживаемый предмет в инвентарь
+        CraftingSlot.resetSearchMod(); // Сбрасываем режим поиска для крафта
         tooltipManager.HideTooltip(); // Скрываем тултип, если он открыт
         inventoryPanel.resetFrameImagesAndInput(); // Сбрасываем изображения рамок и ввод
         chestPanel.resetFrameImagesAndInput(); // Сбрасываем изображения рамок и ввод для сундука
