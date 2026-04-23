@@ -6,13 +6,17 @@ using System.Collections.Generic;
 public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
 {
     [SerializeField] private SkillGroup[] skillGroups;
-    [SerializeField] private int skillPoints = 3;
-    [SerializeField] private int gold = 10;
+
+    // УБРАТЬ локальные переменные
+    // [SerializeField] private int skillPoints = 3;
+    // [SerializeField] private int gold = 10;
+
     [InjectAttribute1] private ISkillUIManager SkillUIManager { get; set; }
     [InjectAttribute1] private ISkillPanelManager SkillPanelManager { get; set; }
     [InjectAttribute1] private ISkillPanelUI skillPanelUI { get; set; }
     [InjectAttribute1] private INotificationManager notificationManager { get; set; }
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
+    [InjectAttribute1] private IPlayerStats playerStats { get; set; } // <-- ВАЖНО: внедряем IPlayerStats
 
     public event System.Action<int> OnSkillPointsChanged;
     public event System.Action<int> OnGoldChanged;
@@ -30,33 +34,8 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         foreach (var group in skillGroups)
         {
             group.Initialize();
-            foreach (var skill in group.skills)
-            {
-                //skill.HandleVisibilityChange(true, group.skills);
-            }
         }
-
         SkillUIManager?.RefreshAllSkills();
-    }
-
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            SetSkillVisibility1("Hidden", 0, true);
-        }
-        if (Input.GetKeyDown(KeyCode.Alpha2))
-        {
-            SetSkillVisibility1("Hidden", 1, true);
-        }
-        if (Input.GetKeyDown(KeyCode.Alpha3))
-        {
-            SetSkillVisibility1("Hidden", 2, true);
-        }
-        if (Input.GetKeyDown(KeyCode.Alpha4))
-        {
-            SetSkillVisibility1("Hidden", 3, true);
-        }
     }
 
     public void UnlockSkill(string groupName, int skillIndex)
@@ -65,15 +44,15 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         if (group == null) return;
 
         Skill skill = group.skills.FirstOrDefault(s => s.skillIndex == skillIndex);
-        if (skill == null || skill.isUnlocked || !skill.CanUnlock(GetAllSkillsInGroup(groupName)) || skillPoints < skill.cost)
+        if (skill == null || skill.isUnlocked || !skill.CanUnlock(GetAllSkillsInGroup(groupName)) || playerStats.SkillPoints < skill.cost)
         {
             if (skill != null) skill.ShakeLockIcon(this);
             return;
         }
 
-        skillPoints -= skill.cost;
+        playerStats.SkillPoints -= skill.cost; // <-- теперь через playerStats
         skill.isUnlocked = true;
-        OnSkillPointsChanged?.Invoke(skillPoints);
+        OnSkillPointsChanged?.Invoke(playerStats.SkillPoints);
         OnSkillsUpdated?.Invoke();
     }
 
@@ -83,15 +62,15 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         if (group == null) return;
 
         Skill skill = group.skills.FirstOrDefault(s => s.skillIndex == skillIndex);
-        if (skill == null || skill.hasQuestionState || gold < skill.questionGoldCost)
+        if (skill == null || skill.hasQuestionState || playerStats.Gold < skill.questionGoldCost)
         {
             if (skill != null) skill.ShakeLockIcon(this);
             return;
         }
 
-        gold -= skill.questionGoldCost;
+        playerStats.Gold -= skill.questionGoldCost;
         skill.hasQuestionState = true;
-        OnGoldChanged?.Invoke(gold);
+        OnGoldChanged?.Invoke(playerStats.Gold);
         OnSkillsUpdated?.Invoke();
     }
 
@@ -119,8 +98,8 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             }
         }
 
-        skillPoints += pointsToReturn;
-        OnSkillPointsChanged?.Invoke(skillPoints);
+        playerStats.SkillPoints += pointsToReturn;
+        OnSkillPointsChanged?.Invoke(playerStats.SkillPoints);
         OnSkillsUpdated?.Invoke();
 
         Debug.Log($"Сброшено навыков: {group.skills.Count(s => s.isUnlocked == false && s.canBeReset)}. Возвращено {pointsToReturn} очков.");
@@ -148,21 +127,21 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
                 skill.hasQuestionState = !skill.hasQuestionByDefault;
             }
         }
-        gold += goldToReturn;
-        OnGoldChanged?.Invoke(gold);
+        playerStats.Gold += goldToReturn;
+        OnGoldChanged?.Invoke(playerStats.Gold);
         OnSkillsUpdated?.Invoke();
     }
 
     public void AddSkillPoints(int points)
     {
-        skillPoints += points;
-        OnSkillPointsChanged?.Invoke(skillPoints);
+        playerStats.SkillPoints += points;
+        OnSkillPointsChanged?.Invoke(playerStats.SkillPoints);
     }
-    public int GetSkillPoints() => skillPoints;
+    public int GetSkillPoints() => playerStats.SkillPoints;
     public Skill[] GetAllSkills() => skillGroups.SelectMany(g => g.skills).ToArray();
     public Skill[] GetAllSkillsInGroup(string groupName) =>
         skillGroups.FirstOrDefault(g => g.groupName == groupName)?.skills ?? new Skill[0];
-    public int GetGold() => gold;
+    public int GetGold() => playerStats.Gold;
     public SkillGroup[] GetSkillGroups() => skillGroups;
 
     public void SetSkillVisibility(string groupName, int skillIndex, bool isVisible)
@@ -176,9 +155,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         skill.HandleVisibilityChange(isVisible, GetAllSkillsInGroup(groupName));
         OnSkillsUpdated?.Invoke();
     }
+
     public void SetSkillVisibility1(string groupName, int skillIndex, bool isVisible)
     {
-        // Находим группу навыков по имени
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
         if (group == null)
         {
@@ -186,7 +165,6 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             return;
         }
 
-        // Находим конкретный навык по индексу
         Skill skill = group.skills.FirstOrDefault(s => s.skillIndex == skillIndex);
         if (skill == null)
         {
@@ -194,7 +172,6 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             return;
         }
 
-        // Обновляем видимость только для выбранного навыка
         skill.HandleVisibilityChange(isVisible, GetAllSkillsInGroup(groupName));
         if (SkillPanelManager.GetCurrentPanelName() == "Hidden")
         {
@@ -205,8 +182,6 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         {
             skillPanelUI?.UnlockPanel(groupName);
         }
-
-        // Уведомляем об обновлении навыков
         OnSkillsUpdated?.Invoke();
     }
 
@@ -240,8 +215,8 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             ResetSkillUpgrades(groupName, skillIndex);
             skillToReset.isUnlocked = false;
             skillToReset.UpdateUI(true, GetAllSkillsInGroup(groupName));
-            skillPoints += skillToReset.cost;
-            OnSkillPointsChanged?.Invoke(skillPoints);
+            playerStats.SkillPoints += skillToReset.cost;
+            OnSkillPointsChanged?.Invoke(playerStats.SkillPoints);
             OnSkillsUpdated?.Invoke();
             Debug.Log($"Сброшен навык: {skillToReset.skillName}. Возвращено {skillToReset.cost} очков.");
         };
@@ -257,8 +232,8 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
                     skill.isUnlocked = false;
                     skill.UpdateUI(true, GetAllSkillsInGroup(groupName));
                 }
-                skillPoints += totalPointsToReturn;
-                OnSkillPointsChanged?.Invoke(skillPoints);
+                playerStats.SkillPoints += totalPointsToReturn;
+                OnSkillPointsChanged?.Invoke(playerStats.SkillPoints);
                 OnSkillsUpdated?.Invoke();
                 Debug.Log($"Сброшены навыки: {string.Join(", ", dependentSkills.Select(s => s.skillName))}. Возвращено {totalPointsToReturn} очков.");
             });
@@ -304,19 +279,20 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             return;
         }
 
-        if (!skill.CanUpgrade(gold))
+        if (!skill.CanUpgrade(playerStats.Gold))
         {
             Debug.LogWarning($"Недостаточно золота или навык {skill.skillName} уже на максимальном уровне!");
             skill.ShakeLockIcon(this);
             return;
         }
 
-        gold -= skill.upgradeCosts[skill.currentLevel];
+        playerStats.Gold -= skill.upgradeCosts[skill.currentLevel];
         skill.currentLevel++;
-        OnGoldChanged?.Invoke(gold);
+        OnGoldChanged?.Invoke(playerStats.Gold);
         OnSkillsUpdated?.Invoke();
         Debug.Log($"Навык {skill.skillName} улучшен до уровня {skill.currentLevel}. Потрачено {skill.upgradeCosts[skill.currentLevel - 1]} золота.");
     }
+
     public void ResetSkillUpgrades(string groupName, int skillIndex)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -339,18 +315,16 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             return;
         }
 
-        // Возвращаем золото за все улучшения
         int goldToReturn = skill.upgradeCosts.Take(skill.currentLevel).Sum();
-        gold += goldToReturn;
+        playerStats.Gold += goldToReturn;
 
-        // Сбрасываем уровень навыка
         skill.currentLevel = 1;
-
-        OnGoldChanged?.Invoke(gold);
+        OnGoldChanged?.Invoke(playerStats.Gold);
         OnSkillsUpdated?.Invoke();
 
         Debug.Log($"Улучшения для навыка {skill.skillName} сброшены. Возвращено {goldToReturn} золота.");
     }
+
     public void ResetSkillToLevel(string groupName, int skillIndex, int targetLevel)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -373,14 +347,11 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             return;
         }
 
-        // Возвращаем золото за сброшенные уровни
         int goldToReturn = skill.upgradeCosts.Skip(targetLevel).Take(skill.currentLevel - targetLevel).Sum();
-        gold += goldToReturn;
+        playerStats.Gold += goldToReturn;
 
-        // Устанавливаем новый уровень
         skill.currentLevel = targetLevel;
-
-        OnGoldChanged?.Invoke(gold);
+        OnGoldChanged?.Invoke(playerStats.Gold);
         OnSkillsUpdated?.Invoke();
 
         Debug.Log($"Навык {skill.skillName} сброшен до уровня {targetLevel}. Возвращено {goldToReturn} золота.");

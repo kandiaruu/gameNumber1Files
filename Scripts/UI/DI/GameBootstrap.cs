@@ -70,6 +70,20 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private ThirdPersonCharacter thirdPersonCharacter;
     [Dependency(new[] { typeof(IChestUIController) }, typeof(ChestUIController), Lifecycle.Singleton)]
     [SerializeField] private ChestUIController chestUIController;
+    [Dependency(new[] { typeof(IPlayerStats) }, typeof(PlayerStats), Lifecycle.Singleton)]
+    [SerializeField] private PlayerStats playerStats;
+    [Dependency(new[] { typeof(IInventoryPanel2) }, typeof(InventoryPanel2), Lifecycle.Singleton)]
+    [SerializeField] private InventoryPanel2 inventoryPanel2;
+    [Dependency(new[] { typeof(IInventoryPanel3) }, typeof(InventoryPanel3), Lifecycle.Singleton)]
+    [SerializeField] private InventoryPanel3 inventoryPanel3;
+    [Dependency(new[] { typeof(IInventorySearch3) }, typeof(InventorySearch3), Lifecycle.Singleton)]
+    [SerializeField] private InventorySearch3 inventorySearch3;
+    [Dependency(new[] { typeof(ILootManager3) }, typeof(LootManager3), Lifecycle.Singleton)]
+    [SerializeField] private LootManager3 lootManager3;
+    [Dependency(new[] { typeof(IPanel) }, typeof(LootPanel3), Lifecycle.Singleton)]
+    [SerializeField] private LootPanel3 lootPanel3;
+    [Dependency(new[] { typeof(ILootInventoryPanel3) }, typeof(InventoryPanel3), Lifecycle.Singleton)]
+    [SerializeField] private InventoryPanel3 inventoryLootPanel3;
 
     private static FieldInfo[] _dependencyFields;
     private static FieldInfo[] _allFields;

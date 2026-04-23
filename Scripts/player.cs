@@ -2,84 +2,221 @@ using UnityEngine;
 
 public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
 {
+    [InjectAttribute1] public IPlayerStats playerStats { get; set; }
     [SerializeField] private GameObject eKeyIcon;
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float sprintSpeed = 10f;
     [SerializeField] private float jumpForce = 10f;
     [SerializeField] private float groundCheckDistance = 0.2f;
+    private float attackCooldown = 0f;
     public ThirdPersonCamera cameraController;
     private Rigidbody rb;
     private bool isGrounded;
 
     private static readonly Vector3 GroundCheckOffset = Vector3.up * 0.1f;
+    [SerializeField] private Animator animator; // добавили
+    [SerializeField] private DamagePopupSpawner damagePopupSpawner;
+    [Header("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip swordSwingSound;
+    [SerializeField] private AudioClip swordHitSound;
+    [SerializeField] private ChainGenerator dungeonGenerator;
+    [SerializeField] private float interactDistance = 10f;
 
     [InjectAttribute1] private IUIManager uiManager { get; set; }
     [InjectAttribute1] private IChestUIController chestUIController { get; set; }
 
     private void Awake()
+        {
+            rb = GetComponent<Rigidbody>();
+            if (!rb)
+                Debug.LogError("No Rigidbody component found on " + name);
+
+            if (audioSource == null)
+            {
+                audioSource = GetComponent<AudioSource>();
+                if (audioSource == null)
+                {
+                    // можно создать или просто написать ошибку
+                    Debug.LogWarning("AudioSource is NULL on " + name + ". " +
+                                    "Добавь компонент AudioSource и привяжи его в инспекторе.");
+                }
+            }
+            // 1. Если что-то уже привязано в Inspector — оставляем
+        }
+    private void Start()
     {
-        rb = GetComponent<Rigidbody>();
-        if (!rb) Debug.LogError("No Rigidbody component found!");
+        DependencyContainer1.InjectDependencies(this);
     }
 
     private void Update()
     {
-        CheckForChestAndToggleIcon();
+        attackCooldown -= Time.deltaTime;
+        CheckForInteractableAndToggleIcon();
         if (Input.GetKeyDown(KeyCode.E))
         {
-            TryOpenNearbyChest();
+            TryInteract(); // единая точка взаимодействия
         }
         // Jump handling
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             Jump();
         }
+
+        if (Input.GetMouseButtonDown(0) && attackCooldown <= 0f)
+        {
+            PlayAttackAnimation();
+            attackCooldown = 1f / playerStats.AtkSpeed;
+        }
     }
 
-    private void CheckForChestAndToggleIcon()
+    public void OnSwing()
     {
-        Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0);
-        Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
-        RaycastHit hit;
-        float maxDistance = 10f;
-
-        bool lookingAtChest = false;
-
-        if (Physics.Raycast(ray, out hit, maxDistance))
+        // звук
+        if (audioSource != null && swordSwingSound != null)
         {
-            if (hit.collider.TryGetComponent(out Chest chest))
+            audioSource.PlayOneShot(swordSwingSound);
+        }
+    }
+    public void OnAttackHit()
+    {
+        TryAttackEnemy();
+    }
+
+    private void PlayAttackAnimation()
+    {
+        //if (animator == null) return;
+
+        // Скорость анимации зависит от AtkSpeed
+        Debug.Log("PlayAttackAnimation called");
+        float baseAttackSpeed = 1f; // клип делали под AtkSpeed = 1
+        float animSpeed = Mathf.Max(0.1f, playerStats.AtkSpeed / baseAttackSpeed);
+        animator.speed = animSpeed;
+
+        animator.SetTrigger("Attack");
+    }
+
+    private void TryAttackEnemy()
+    {
+        Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
+        Camera cam = cameraController.GetComponent<Camera>();
+        Ray ray = cam.ScreenPointToRay(screenCenter);
+
+        float attackRange = playerStats.AtkRange;
+
+        RaycastHit[] hits = Physics.RaycastAll(ray, attackRange);
+
+        EnemyAI hitEnemy = null;
+        bool critHit = false;
+
+        foreach (var hit in hits)
+        {
+            // Сначала ищем CritPoint
+            if (hit.collider.CompareTag("CritPoint"))
             {
-                lookingAtChest = true;
+                var critMarker = hit.collider.GetComponent<CritPointMarker>();
+                if (critMarker != null)
+                {
+                    if (audioSource != null && swordHitSound != null)
+                    {
+                        audioSource.PlayOneShot(swordHitSound);
+                    }
+                    critMarker.OnCritHit();
+                    float dmg = playerStats.CalculateDamage(true);
+                    critMarker.owner.TakeDamage(dmg);
+                    damagePopupSpawner.ShowDamage(critMarker.owner.transform, dmg, true, DamageType.Pure);
+                    Debug.Log("Critical Hit!");
+                    critHit = true;
+                    break; // Сразу выходим — крит приоритетнее обычного
+                }
+            }
+            // Запоминаем обычного врага, если не было крита
+            else if (hit.collider.CompareTag("Enemy") && !critHit)
+            {
+                hitEnemy = hit.collider.GetComponent<EnemyAI>();
             }
         }
 
-        // Включаем или выключаем иконку
-        if (eKeyIcon != null)
-            eKeyIcon.SetActive(lookingAtChest);
-    }
-
-    void TryOpenNearbyChest()
-    {
-        // Берём центр экрана (например, для UI точки по центру, как прицел)
-        Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0);
-
-        // Получаем луч из центра экрана в мире
-        Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
-        RaycastHit hit;
-
-        // Максимальная дистанция проверки, например 2f (можно увеличить/уменьшить по желанию)
-        float maxDistance = 10f;
-
-        // Проверяем, попали ли мы в сундук
-        if (Physics.Raycast(ray, out hit, maxDistance))
+        // Если не было крита, но попали по врагу — обычный урон
+        if (!critHit && hitEnemy != null)
         {
-            if (hit.collider.TryGetComponent(out Chest chest))
+            if (audioSource != null && swordHitSound != null)
             {
-                uiManager.OpenPanel(UIManager.PanelType.Inventory);
-                chestUIController.OpenChestUI(chest);
+                audioSource.PlayOneShot(swordHitSound);
             }
+            float dmg = playerStats.CalculateDamage(false);
+            hitEnemy.TakeDamage(dmg);
+            damagePopupSpawner.ShowDamage(hitEnemy.transform, dmg, false, DamageType.Magical);
+            Debug.Log("Normal Hit!");
         }
     }
+
+private void CheckForInteractableAndToggleIcon()
+{
+    Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
+    Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
+
+    bool lookingAtInteractable = false;
+
+    if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
+    {
+        // Вход в данж из обычного мира
+        if (hit.collider.GetComponentInParent<DungeonEntrance>() != null)
+            lookingAtInteractable = true;
+        // Двери данжа
+        else if (hit.collider.GetComponentInParent<DoorInteractable>() != null)
+            lookingAtInteractable = true;
+        // Сундуки
+        else if (hit.collider.GetComponentInParent<Chest>() != null)
+            lookingAtInteractable = true;
+    }
+
+    if (eKeyIcon != null)
+        eKeyIcon.SetActive(lookingAtInteractable);
+}
+
+private void TryInteract()
+{
+    Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
+    Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
+
+    if (!Physics.Raycast(ray, out RaycastHit hit, interactDistance))
+    {
+        Debug.Log("[Player] TryInteract: raycast missed");
+        return;
+    }
+
+    Debug.Log("[Player] Hit: " + hit.collider.name);
+
+    // 1) Вход в данж (обычный мир -> teleport room)
+    // var entrance = hit.collider.GetComponentInParent<DungeonEntrance>();
+    // if (entrance != null)
+    // {
+    //     Debug.Log("[Player] Interact -> DungeonEntrance");
+    //     if (dungeonGenerator != null)
+    //         dungeonGenerator.EnterDungeonFromWorld(transform);
+    //     else
+    //         Debug.LogWarning("[Player] dungeonGenerator is NULL");
+    //     return;
+    // }
+
+    // 2) Двери внутри данжа (door-to-door)
+    var interactable = hit.collider.GetComponentInParent<DoorInteractable>();
+    if (interactable != null && interactable.portal != null)
+    {
+        dungeonGenerator.Interact(interactable.portal, hit.collider);
+    }
+
+    // 3) Сунд��к
+    var chest = hit.collider.GetComponentInParent<Chest>();
+    if (chest != null)
+    {
+        Debug.Log("[Player] Interact -> Chest");
+        uiManager.OpenPanel(UIManager.PanelType.Inventory);
+        chestUIController.OpenChestUI(chest);
+        return;
+    }
+}
 
     private void FixedUpdate()
     {

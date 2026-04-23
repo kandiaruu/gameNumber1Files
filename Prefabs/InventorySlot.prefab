@@ -506,6 +506,7 @@ MonoBehaviour:
   realbackgroundImage: {fileID: 2047660705491160336}
   stackText: {fileID: 6223410201435405526}
   inventoryPanel: {fileID: 0}
+  isYellow: 0
 --- !u!1 &6237718187844602326
 GameObject:
   m_ObjectHideFlags: 0

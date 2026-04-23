@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using TMPro;
 public class UIManager : MonoBehaviour, IUIManager
 {
     public enum PanelType
@@ -11,7 +12,12 @@ public class UIManager : MonoBehaviour, IUIManager
         Tooltip,
         Selection,
         SkillGui,
-        ItemInfo
+        ItemInfo,
+        Status,
+        Inventory2, // Добавлен новый тип панели
+        Inventory3,
+        Inventory3LootPanel,
+        Inventory3LKMPanel
     }
 
     [System.Serializable]
@@ -36,11 +42,12 @@ public class UIManager : MonoBehaviour, IUIManager
 
     [SerializeField] private GameObject eKeyIcon;
     [SerializeField] private GameObject dotObject;
+    [SerializeField] private TextMeshProUGUI hpText;
+    [SerializeField] private TextMeshProUGUI mpText;
     [SerializeField] private List<PanelConfig> panelConfigs = new List<PanelConfig>();
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
-    [InjectAttribute1] private ISkillTreeManager skillLogicManager{ get; set; }
     [InjectAttribute1] private ISkillUIManager skillUIManager{ get; set; }
-    [InjectAttribute1] private INotificationManager notificationManager{ get; set; }
+    [InjectAttribute1] private IInventorySearch3 inventorySearch3 { get; set; }
     [SerializeField] private List<PanelScriptControl> panelScriptControls = new List<PanelScriptControl>();
     private Dictionary<PanelType, GameObject> panelCache = new Dictionary<PanelType, GameObject>();
     private const int MAX_DEPTH = 5; // Максимальная глубина иерархии
@@ -60,7 +67,8 @@ public class UIManager : MonoBehaviour, IUIManager
         {
             { KeyCode.Escape, PanelType.Settings },
             { KeyCode.Tab, PanelType.Inventory },
-            { KeyCode.U, PanelType.SkillTree }
+            { KeyCode.U, PanelType.SkillTree },
+            { KeyCode.BackQuote, PanelType.Status }
         };
 
         Cursor.visible = false;
@@ -84,9 +92,11 @@ public class UIManager : MonoBehaviour, IUIManager
             }
         }
 
-        if (dotObject != null && eKeyIcon != null)
+        if (dotObject != null && eKeyIcon != null && hpText != null && mpText != null)
         {
             // Если открыта панель, скрываем иконку
+            hpText.gameObject.SetActive(!anyPanelOpen);
+            mpText.gameObject.SetActive(!anyPanelOpen);
             eKeyIcon.SetActive(!anyPanelOpen);
             dotObject.SetActive(!anyPanelOpen);
         }
@@ -170,7 +180,7 @@ public class UIManager : MonoBehaviour, IUIManager
                         return;
                     }
                 }
-                if (InventorySlot.returnEscape() == false)
+                if (inventorySearch3.returnSearching() == false)
                 {
                     CloseCurrentPanel();
                 }
@@ -186,11 +196,15 @@ public class UIManager : MonoBehaviour, IUIManager
         }
         else if (Input.GetKeyDown(KeyCode.Tab))
         {
-            TogglePanel(PanelType.Inventory);
+            TogglePanel(PanelType.Inventory3);
         }
         else if (Input.GetKeyDown(KeyCode.U))
         {
             TogglePanel(PanelType.SkillTree);
+        }
+        else if (Input.GetKeyDown(KeyCode.BackQuote))
+        {
+            TogglePanel(PanelType.Status);
         }
     }
 

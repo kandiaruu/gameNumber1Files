@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6432dc9cf03898c448322dec3be32f12, type: 3}
+  m_Name: ItemDatabase3
+  m_EditorClassIdentifier: 
+  items:
+  - id: 0
+    itemName: kamen
+    description: kamen
+    icon: {fileID: 21300000, guid: 13745740b64ac5540b49f0e602ded8c9, type: 3}
+    isStackable: 1
+    categories:
+    - weapon
+    - consumable
+  - id: 1
+    itemName: zzz
+    description: kamen
+    icon: {fileID: 21300000, guid: 610318afcd8122147a60308df2df058f, type: 3}
+    isStackable: 0
+    categories: []
+  - id: 2
+    itemName: poisona
+    description: kamen
+    icon: {fileID: 21300000, guid: 84c45a74014ac744d9a0c1d0fab4e7d1, type: 3}
+    isStackable: 1
+    categories:
+    - weapon
+    - consumable
+  - id: 3
+    itemName: sword
+    description: sword
+    icon: {fileID: 21300000, guid: 589fd357011eee24c9d0c870cd942e1f, type: 3}
+    isStackable: 0
+    categories:
+    - weapon
