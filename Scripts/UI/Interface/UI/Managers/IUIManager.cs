@@ -8,4 +8,6 @@ public interface IUIManager
     bool ShouldAllowNavigation(); // Новый метод
     bool ShouldAllowSkillButtonInteraction(); // Новый метод
     void OpenPanel(UIManager.PanelType panelType);
+    void CloseCurrentPanel();
+    void CloseAllChildren(UIManager.PanelType parentPanelType);
 }

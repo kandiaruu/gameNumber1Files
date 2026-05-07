@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 86386f434c750fc44ba68422d8d81847, type: 3}
   m_Name: Dungeon1
   m_EditorClassIdentifier: 
-  seed: 12347
-  maxRooms: 100
+  seed: 10129
+  maxRooms: 30

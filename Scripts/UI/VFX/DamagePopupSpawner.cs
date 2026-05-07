@@ -15,4 +15,15 @@ public class DamagePopupSpawner : MonoBehaviour
         Camera cam = mainCamera != null ? mainCamera : Camera.main;
         popup.Init(damage, isCrit, damageType, target, defaultOffset, cam);
     }
+
+    public void ShowMessage(Transform target, string message, Color color)
+    {
+        if (popupPrefab == null || popupCanvas == null || target == null) return;
+
+        DamagePopup popup = Instantiate(popupPrefab, popupCanvas.transform);
+        Camera cam = mainCamera != null ? mainCamera : Camera.main;
+        
+        // Vector3.zero означает, что текст появится точно в центре объекта (на его pivot point)
+        popup.InitMessage(message, color, target, Vector3.zero, cam);
+    }
 }

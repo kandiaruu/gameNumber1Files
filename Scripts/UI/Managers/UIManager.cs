@@ -17,7 +17,14 @@ public class UIManager : MonoBehaviour, IUIManager
         Inventory2, // Добавлен новый тип панели
         Inventory3,
         Inventory3LootPanel,
-        Inventory3LKMPanel
+        Inventory3LKMPanel,
+        Map,
+        Loading,
+        DungeonEntry,
+        MerchantPanel,
+        SettingsGeneral,
+        SettingsControls,
+        SkillSelect
     }
 
     [System.Serializable]
@@ -44,22 +51,21 @@ public class UIManager : MonoBehaviour, IUIManager
     [SerializeField] private GameObject dotObject;
     [SerializeField] private TextMeshProUGUI hpText;
     [SerializeField] private TextMeshProUGUI mpText;
+    [SerializeField] private GameObject minimapObject;
     [SerializeField] private List<PanelConfig> panelConfigs = new List<PanelConfig>();
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
     [InjectAttribute1] private ISkillUIManager skillUIManager{ get; set; }
     [InjectAttribute1] private IInventorySearch3 inventorySearch3 { get; set; }
     [SerializeField] private List<PanelScriptControl> panelScriptControls = new List<PanelScriptControl>();
     private Dictionary<PanelType, GameObject> panelCache = new Dictionary<PanelType, GameObject>();
-    private const int MAX_DEPTH = 5; // Максимальная глубина иерархии
+    private const int MAX_DEPTH = 5;
 
     private IPanel currentPanel;
     private Dictionary<KeyCode, PanelType> keyMap;
+    public Dictionary<PanelType, KeyCode> PanelKeys { get; private set; } = new Dictionary<PanelType, KeyCode>();
 
     void Awake()
     {
-        // Проверяем на дубликаты
-
-        //DependencyContainer.Instance.RegisterManual(this);
 
         InitializePanelSystem();
 
@@ -68,20 +74,37 @@ public class UIManager : MonoBehaviour, IUIManager
             { KeyCode.Escape, PanelType.Settings },
             { KeyCode.Tab, PanelType.Inventory },
             { KeyCode.U, PanelType.SkillTree },
-            { KeyCode.BackQuote, PanelType.Status }
+            { KeyCode.BackQuote, PanelType.Status },
+            { KeyCode.M, PanelType.Map}
         };
 
         Cursor.visible = false;
         CachePanels();
+        LoadPanelKeys();
     }
     void Start()
     {
-        HideAllPanels(); // Moved to Start to ensure all Awake() methods have completed
+        HideAllPanels();
+    }
+
+    public void LoadPanelKeys()
+    {
+        PanelKeys[PanelType.Inventory3] = (KeyCode)System.Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Key_Inventory3", KeyCode.Tab.ToString()));
+        PanelKeys[PanelType.SkillTree] = (KeyCode)System.Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Key_SkillTree", KeyCode.U.ToString()));
+        PanelKeys[PanelType.Status] = (KeyCode)System.Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Key_Status", KeyCode.BackQuote.ToString()));
+        PanelKeys[PanelType.Map] = (KeyCode)System.Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Key_Map", KeyCode.M.ToString()));
+        PanelKeys[PanelType.SkillSelect] = (KeyCode)System.Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Key_SkillSelect", KeyCode.O.ToString()));
+    }
+
+    public void SetPanelKey(PanelType type, KeyCode key)
+    {
+        PanelKeys[type] = key;
+        PlayerPrefs.SetString("Key_" + type.ToString(), key.ToString());
+        PlayerPrefs.Save();
     }
     
     private void UpdateDotVisibility()
     {
-        // Проверяем, есть ли открытые панели
         bool anyPanelOpen = false;
         foreach (var config in panelConfigs)
         {
@@ -92,17 +115,16 @@ public class UIManager : MonoBehaviour, IUIManager
             }
         }
 
-        if (dotObject != null && eKeyIcon != null && hpText != null && mpText != null)
+        if (dotObject != null && eKeyIcon != null && hpText != null && mpText != null && minimapObject != null)
         {
-            // Если открыта панель, скрываем иконку
             hpText.gameObject.SetActive(!anyPanelOpen);
             mpText.gameObject.SetActive(!anyPanelOpen);
             eKeyIcon.SetActive(!anyPanelOpen);
             dotObject.SetActive(!anyPanelOpen);
+            minimapObject.SetActive(!anyPanelOpen);
         }
     }
 
-    // Рекурсивный метод для проверки, открыта ли панель или ее дочерняя
     private bool IsPanelOrChildOpen(PanelConfig config)
     {
         if (config.panelObject != null && config.panelObject.activeSelf)
@@ -110,16 +132,9 @@ public class UIManager : MonoBehaviour, IUIManager
             return true;
         }
 
-        // foreach (var child in config.childPanels)
-        // {
-        //     if (IsPanelOrChildOpen(child))
-        //         return true;
-        // }
         return false;
     }
 
-
-    // Остальной код UIManager без изменений...
     private void CachePanels()
     {
         panelCache.Clear();
@@ -166,6 +181,7 @@ public class UIManager : MonoBehaviour, IUIManager
 
     void Update()
     {
+        // Кнопку Escape оставляем жестко зашитой, чтобы игрок случайно не удалил её и не застрял в меню
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             if (currentPanel != null)
@@ -180,13 +196,17 @@ public class UIManager : MonoBehaviour, IUIManager
                         return;
                     }
                 }
-                if (inventorySearch3.returnSearching() == false)
+                if (inventorySearch3 != null && inventorySearch3.returnSearching() == false)
                 {
                     CloseCurrentPanel();
                 }
-                else
+                else if (inventorySearch3 != null && inventorySearch3.returnSearching() == true)
                 {
                     Debug.Log("Escape не сработал, так как активна панель инвентаря");
+                }
+                else 
+                {
+                    CloseCurrentPanel();
                 }
             }
             else
@@ -194,17 +214,25 @@ public class UIManager : MonoBehaviour, IUIManager
                 TogglePanel(PanelType.Settings);
             }
         }
-        else if (Input.GetKeyDown(KeyCode.Tab))
+        else if (PanelKeys.ContainsKey(PanelType.Inventory3) && Input.GetKeyDown(PanelKeys[PanelType.Inventory3]))
         {
             TogglePanel(PanelType.Inventory3);
         }
-        else if (Input.GetKeyDown(KeyCode.U))
+        else if (PanelKeys.ContainsKey(PanelType.SkillTree) && Input.GetKeyDown(PanelKeys[PanelType.SkillTree]))
         {
             TogglePanel(PanelType.SkillTree);
         }
-        else if (Input.GetKeyDown(KeyCode.BackQuote))
+        else if (PanelKeys.ContainsKey(PanelType.Status) && Input.GetKeyDown(PanelKeys[PanelType.Status]))
         {
             TogglePanel(PanelType.Status);
+        }
+        else if (PanelKeys.ContainsKey(PanelType.Map) && Input.GetKeyDown(PanelKeys[PanelType.Map]))
+        {
+            TogglePanel(PanelType.Map);
+        }
+        else if (PanelKeys.ContainsKey(PanelType.SkillSelect) && Input.GetKeyDown(PanelKeys[PanelType.SkillSelect]))
+        {
+            TogglePanel(PanelType.SkillSelect);
         }
     }
 
@@ -236,7 +264,7 @@ public class UIManager : MonoBehaviour, IUIManager
                 SetGamePaused(true);
                 UpdateSkillComponentsState();
                 UpdateScriptStates(panelType);
-                UpdateDotVisibility();  // <--- вызов
+                UpdateDotVisibility(); 
             }
             else
             {
@@ -249,22 +277,22 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
-    private void CloseCurrentPanel()
+    public void CloseCurrentPanel()
     {
         if (currentPanel != null)
         {
             currentPanel.Close();
-            // Проверяем, является ли закрываемая панель SkillTree
+
             var currentConfig = FindPanelConfig(panelConfigs, currentPanel.PanelObject);
             if (currentConfig != null && currentConfig.panelType == PanelType.SkillTree)
             {
-                skillTreeNavigation?.ResetNavigation(); // Сбрасываем позицию и масштаб skillHolder
+                skillTreeNavigation?.ResetNavigation();
             }
             currentPanel = null;
             SetGamePaused(false);
             UpdateSkillComponentsState();
             UpdateScriptStates(null);
-            UpdateDotVisibility();  // <--- вызов
+            UpdateDotVisibility(); 
         }
     }
 
@@ -277,11 +305,11 @@ public class UIManager : MonoBehaviour, IUIManager
         currentPanel = null;
         if (skillTreeNavigation != null)
         {
-            skillTreeNavigation.ResetNavigation(); // Сбрасываем при скрытии всех панелей
+            skillTreeNavigation.ResetNavigation();
         }
         UpdateSkillComponentsState();
         UpdateScriptStates(null);
-        UpdateDotVisibility();  // <--- вызов
+        UpdateDotVisibility();
     }
 
     private void HidePanelRecursive(PanelConfig config)
@@ -306,13 +334,13 @@ public class UIManager : MonoBehaviour, IUIManager
 
         if (paused)
         {
-            Cursor.lockState = CursorLockMode.None; // Разблокируем курсор
-            Cursor.visible = true;                  // Показываем курсор
+            Cursor.lockState = CursorLockMode.None; 
+            Cursor.visible = true;                  
         }
         else
         {
-            Cursor.lockState = CursorLockMode.Locked; // Замораживаем курсор по центру
-            Cursor.visible = false;                   // Прячем курсор
+            Cursor.lockState = CursorLockMode.Locked; 
+            Cursor.visible = false;                   
         }
     }
 
@@ -445,7 +473,7 @@ public class UIManager : MonoBehaviour, IUIManager
         {
             Debug.Log("Активная панель не найдена, разрешаем взаимодействие с кнопками по умолчанию");
         }
-        return true; // Если нет активной панели или взаимодействие разрешено
+        return true;
     }
 
     private PanelConfig FindPanelConfig(List<PanelConfig> configs, GameObject panelObject)
@@ -517,29 +545,24 @@ public class UIManager : MonoBehaviour, IUIManager
                     return false;
                 }
             }
-            return true; // Если нет активной панели или навигация разрешена
+            return true;
         }
 
     private void FindActivePanelConfigRecursive(List<PanelConfig> configs, ref PanelConfig deepestActiveConfig, int currentDepth)
     {
         foreach (var config in configs)
         {
-            // Проверяем, активна ли текущая панель
             if (config.panelObject != null && config.panelObject.activeSelf)
             {
-                // Если это самая глубокая активная панель на данный момент, обновляем
                 if (deepestActiveConfig == null || currentDepth > GetDepth(panelConfigs, deepestActiveConfig))
                 {
                     deepestActiveConfig = config;
                 }
             }
-
-            // Рекурсивно проверяем дочерние панели
             FindActivePanelConfigRecursive(config.childPanels, ref deepestActiveConfig, currentDepth + 1);
         }
     }
 
-    // Вспомогательный метод для определения глубины панели в иерархии
     private int GetDepth(List<PanelConfig> configs, PanelConfig targetConfig)
     {
         return GetDepthRecursive(configs, targetConfig, 0);
@@ -559,6 +582,30 @@ public class UIManager : MonoBehaviour, IUIManager
                 return childDepth;
             }
         }
-        return -1; // Не нашли
+        return -1;
+    }
+
+    public void CloseAllChildren(PanelType parentPanelType)
+    {
+        var parentConfig = FindPanelConfigByType(panelConfigs, parentPanelType);
+        if (parentConfig != null)
+        {
+            foreach (var childConfig in parentConfig.childPanels)
+            {
+                if (childConfig.panelObject != null)
+                {
+                    var childPanel = childConfig.panelObject.GetComponent<IPanel>();
+                    if (childPanel != null)
+                    {
+                        childPanel.Close();
+                    }
+                    else
+                    {
+                        // На случай, если на панели нет IPanel
+                        childConfig.panelObject.SetActive(false); 
+                    }
+                }
+            }
+        }
     }
 }

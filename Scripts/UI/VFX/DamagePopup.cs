@@ -41,6 +41,21 @@ public class DamagePopup : MonoBehaviour
         StartCoroutine(FadeAndDestroy());
     }
 
+    public void InitMessage(string message, Color color, Transform target, Vector3 offset, Camera cameraRef)
+    {
+        this.target = target;
+        this.worldOffset = offset;
+        this.cam = cameraRef;
+
+        damageText.text = message;
+        damageText.color = color;
+        
+        if (critIcon != null) critIcon.gameObject.SetActive(false);
+        if (canvasGroup != null) canvasGroup.alpha = 1f;
+
+        StartCoroutine(FadeAndDestroy());
+    }
+
     private void Update()
     {
         if (target == null || cam == null) return;
@@ -71,7 +86,7 @@ public class DamagePopup : MonoBehaviour
         switch (type)
         {
             case DamageType.Divine:   return Color.white;                         // белый
-            case DamageType.Physical: return new Color(0.7f, 0.7f, 0.7f, 1f);     // серый
+            case DamageType.Physical: return new Color(204f / 255f, 85f / 255f, 0f, 1f);  // серый
             case DamageType.Pure:     return new Color(1f, 0.84f, 0f, 1f);        // золотой
             case DamageType.Magical:  return new Color32(214, 167, 226, 255);     // rgb(214,167,226)
             default:                  return Color.white;

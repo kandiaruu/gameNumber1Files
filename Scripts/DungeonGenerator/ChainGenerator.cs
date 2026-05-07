@@ -14,12 +14,6 @@ public class ChainGenerator : MonoBehaviour
     {
         if (usedPortal == null || player == null) return;
 
-        if (usedPortal.linked == null)
-        {
-            Debug.LogWarning($"[GEN] {usedPortal.name} has no linked");
-            return;
-        }
-
         Transform t = null;
         if (pressedCollider == usedPortal.colliderA) t = usedPortal.spawnA;
         else if (pressedCollider == usedPortal.colliderB) t = usedPortal.spawnB;
@@ -29,5 +23,8 @@ public class ChainGenerator : MonoBehaviour
 
         player.position = t.position;
         player.rotation = Quaternion.Euler(0f, t.eulerAngles.y, 0f);
+        // Добавить:
+        var vis = FindFirstObjectByType<DungeonVisibilityManager>();
+        if (vis != null) vis.NotifyPlayerTeleported();
     }
 }

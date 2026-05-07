@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class DungeonBuilder : MonoBehaviour
 {
-    [SerializeField] private DungeonConfig config;
+    [SerializeField] public DungeonConfig config;
     [SerializeField] private RoomPrefabSet prefabs;
     [SerializeField] private Transform root;
 
@@ -13,6 +13,8 @@ public class DungeonBuilder : MonoBehaviour
     [SerializeField] private float corridorToRoomOffset = 3.0f;
     [Header("Debug")]
     [SerializeField] private bool verbosePlacementDebug = true;
+    [SerializeField] private Transform player;
+    private Transform currentMapFolder;
 
     [Header("Portal placement (percent of maxRooms)")]
 
@@ -258,30 +260,38 @@ public class DungeonBuilder : MonoBehaviour
         return true;
     }
 
-    private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
+private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
+{
+    if (door == null) return;
+
+    if (pendingDeadEnds.ContainsKey(door))
+        RemoveAndDestroy(door);
+
+    Vector3 pos = door.SocketPos + dir * roomToCorridorOffset;
+    NodeInstance inst = Instantiate(prefabs.deadEndRoom, Vector3.zero, Quaternion.identity, GetRoot());
+    inst.name = $"PendingDead_{deadEndIndex++}";
+    AlignByAttach(inst, pos, dir);
+    Physics.SyncTransforms();
+
+    // --- СВЯЗЫВАЕМ ТУПИК С РОДИТЕЛЕМ ---
+    NodeInstance parentRoom = door.owner;
+    if (parentRoom != null)
     {
-        if (door == null) return;
-
-        // Убираем старый если был
-        if (pendingDeadEnds.ContainsKey(door))
-            RemoveAndDestroy(door);
-
-        Vector3 pos = door.SocketPos + dir * roomToCorridorOffset;
-        NodeInstance inst = Instantiate(prefabs.deadEndRoom, Vector3.zero, Quaternion.identity, GetRoot());
-        inst.name = $"PendingDead_{deadEndIndex++}";
-        AlignByAttach(inst, pos, dir);
-        Physics.SyncTransforms();
-
-        pendingDeadEnds[door] = new PendingDeadEnd
-        {
-            ownerDoor = door,
-            position = inst.transform.position,
-            rotation = inst.transform.rotation,
-            instance = inst
-        };
-
-        Debug.Log($"[REGISTERERED] {inst.name}, pos={inst.transform.position}, door={door.name}, owner={door.owner?.name}");
+        parentRoom.AddNeighbor(inst); // Комната видит тупик
+        inst.AddNeighbor(parentRoom); // Тупик видит комнату
     }
+    // ----------------------------------
+
+    pendingDeadEnds[door] = new PendingDeadEnd
+    {
+        ownerDoor = door,
+        position = inst.transform.position,
+        rotation = inst.transform.rotation,
+        instance = inst
+    };
+
+    Debug.Log($"[REGISTERERED] {inst.name}, owner={door.owner?.name}");
+}
 
     // Удаляет тупик из сцены и из списка, возвращает данные для респавна
     private PendingDeadEnd PopPendingDeadEnd(DoorPortal door)
@@ -302,8 +312,17 @@ public class DungeonBuilder : MonoBehaviour
         if (pending == null) return;
         NodeInstance inst = Instantiate(prefabs.deadEndRoom, pending.position, pending.rotation, GetRoot());
         inst.name = $"FinalDead_{deadEndIndex++}";
+        spawnedRooms.Add(inst); 
+        
+        // --- СВЯЗЫВАЕМ ФИНАЛЬНЫЙ ТУПИК ---
+        NodeInstance parentRoom = pending.ownerDoor.owner;
+        if (parentRoom != null)
+        {
+            parentRoom.AddNeighbor(inst);
+            inst.AddNeighbor(parentRoom);
+        }
+
         Physics.SyncTransforms();
-        // В список не добавляем — дверь закрыта навсегда
     }
 
     private void RemoveAndDestroy(DoorPortal door)
@@ -362,10 +381,37 @@ public class DungeonBuilder : MonoBehaviour
     {
         if (verbosePlacementDebug) Debug.Log(msg);
     }
+    public void BuildInFolder(Transform newRoot, Transform mapFolder)
+    {
+        this.root = newRoot; // Устанавливаем текущую папку этажа как корень[cite: 14]
+        
+        // Передаем текущую папку карты в менеджер видимости
+        var vis = FindFirstObjectByType<DungeonVisibilityManager>();
+        if (vis != null) 
+        {
+            vis.SetCurrentMapContainer(mapFolder); 
+        }
+
+        Build(); // Запускаем генерацию в новую папку[cite: 14]
+    }
+
+    // Теперь этот метод чистит только списки, но не удаляет объекты в сцене
+    public void ClearLists()
+    {
+        frontier.Clear();
+        spawnedRooms.Clear();
+        pendingDeadEnds.Clear();
+    }
+
+    // Позволяет FloorManager найти список комнат
+    public List<NodeInstance> GetSpawnedRooms()
+    {
+        return spawnedRooms; // spawnedRooms уже есть в твоем коде[cite: 13]
+    }
 
     public void Build()
     {
-        ClearChildren();
+        ClearLists();
         if (!ValidateRefs()) return;
 
         rng = new System.Random(config.seed);
@@ -500,7 +546,7 @@ public class DungeonBuilder : MonoBehaviour
                 nextKind == RoomKind.Triple ? CanPlaceTripleWithDeadEndsAll3(end) :
                 nextKind == RoomKind.Single ? CanPlaceSingleWithDeadEnd(end) :
                 nextKind == RoomKind.Corridor ? CanPlaceCorridorThenDeadEnd(end) :
-                nextKind == RoomKind.Portal ? CanPlaceTripleWithDeadEndsAll3(end) :
+                nextKind == RoomKind.Portal ? CanPlaceSingleWithDeadEnd(end) :
                 true;
 
             if (!canPlace)
@@ -546,15 +592,18 @@ public class DungeonBuilder : MonoBehaviour
             }
         }
 
-        // 5) Закрываем все остатки тупиками
-        // safety = 100000;
-        // while (sideFrontier.Count > 0 && safety-- > 0)
-        // {
-        //     var end = sideFrontier.Dequeue();
-        //     ExpandFromEnd(end, RoomKind.DeadEnd, enqueueExits: false, countAsRoom: false, mainFrontier: null, sideFrontier: sideFrontier);
-        // }
+        // Собираем все выжившие "временные" тупики в общий список
+        foreach (var pending in pendingDeadEnds.Values)
+        {
+            if (pending.instance != null && !spawnedRooms.Contains(pending.instance))
+            {
+                spawnedRooms.Add(pending.instance);
+            }
+        }
 
         Debug.Log($"[BUILD] Done. rooms={spawnedRooms.Count}, portalPlaced={portalPlaced}, seed={config.seed}");
+        var vis = FindFirstObjectByType<DungeonVisibilityManager>();
+        if (vis != null) vis.RegisterRooms(spawnedRooms);
     }
 
     private RoomKind RollAnyKindExceptCorridor()
@@ -597,11 +646,10 @@ public class DungeonBuilder : MonoBehaviour
 
         AlignByAttach(node, end.fromDoor.SocketPos + dir * GetRoomOffset(kind), dir);
 
-        DoorPortal nodeDoor = GetAnyDoor(node);
-        if (nodeDoor != null)
+        if (end.fromRoom != null)
         {
-            end.fromDoor.linked = nodeDoor;
-            nodeDoor.linked = end.fromDoor;
+            end.fromRoom.AddNeighbor(node);
+            node.AddNeighbor(end.fromRoom);
         }
 
         // Добавляем выходы только в sideFrontier!
@@ -652,10 +700,12 @@ public class DungeonBuilder : MonoBehaviour
         AlignByAttach(node, end.fromDoor.SocketPos + dir * GetRoomOffset(kind), dir);
 
         DoorPortal nodeDoor = GetForwardDoor(node);
-        if (nodeDoor != null)
+
+        // <--- ИСПРАВЛЕНИЕ: Соседство ставим безусловно --->
+        if (end.fromRoom != null)
         {
-            end.fromDoor.linked = nodeDoor;
-            nodeDoor.linked = end.fromDoor;
+            end.fromRoom.AddNeighbor(node);
+            node.AddNeighbor(end.fromRoom);
         }
         // Перед использованием end, fromRoom, fromDoor, node, nodeDoor, mainFrontier:
         if (end == null)

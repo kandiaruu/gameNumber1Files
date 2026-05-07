@@ -33,6 +33,9 @@ public class PlayerStats : MonoBehaviour, IPlayerStats
     [SerializeField] private float magicArmor = 0f;              // in %
     [SerializeField] private float dodgeChance = 0f;             // in %
     [SerializeField] private float damageResistance = 0f;        // in %, works against all except absolute
+    [Header("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip deathMusic;
 
     [Header("Regen Stats")]
     [SerializeField] private float hpRegen = 1f;                // HP regen per second
@@ -41,6 +44,7 @@ public class PlayerStats : MonoBehaviour, IPlayerStats
     // [SerializeField] private float damage = 0f;
     [SerializeField] private float atkSpeed = 2f;
     [SerializeField] private float atkRange = 2f; // Дистанция атаки по умолчанию
+    [InjectAttribute1] private IDungeonFloorManager floorManager { get; set; }
 
     public float AtkRange => atkRange;
     public float AtkSpeed => atkSpeed;
@@ -282,15 +286,38 @@ public class PlayerStats : MonoBehaviour, IPlayerStats
         SetHP(currentHP - finalDamage);
 
     }
+    private void Awake()
+    {
+        DependencyContainer1.InjectDependencies(this);
 
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
+    }
     // Восстановление HP и MP каждую секунду
     private void Update()
     {
         if (currentHP <= 0f)
         {
-            Debug.Log("Player is dead!");
-            // Здесь можно добавить логику смерти, перезагрузки уровня и т.д.
-            return;
+            Debug.Log("Player is dead! Respawning...");
+            RestoreHealth(); // Полностью восстанавливаем HP и MP
+
+            if (audioSource != null && deathMusic != null)
+            {
+                audioSource.PlayOneShot(deathMusic);
+            }
+            
+            if (floorManager != null && floorManager.IsInsideDungeon)
+            {
+                // Удаляем подземелье и возвращаемся в мир
+                floorManager.ExitAndDeleteDungeon(); 
+            }
+            else
+            {
+                floorManager.RespawnPlayerInWorld();
+            }
+            return; // Пропускаем реген и прочее в этом кадре
         }
 
         updateHM();
@@ -309,6 +336,12 @@ public class PlayerStats : MonoBehaviour, IPlayerStats
         {
             LevelUp();
         }
+    }
+
+    public void RestoreHealth()
+    {
+        SetHP(maxHP);
+        SetMP(maxMP);
     }
 
     // Метод восстановления HP и MP

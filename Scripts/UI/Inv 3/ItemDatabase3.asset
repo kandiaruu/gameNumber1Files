@@ -19,13 +19,12 @@ MonoBehaviour:
     icon: {fileID: 21300000, guid: 13745740b64ac5540b49f0e602ded8c9, type: 3}
     isStackable: 1
     categories:
-    - weapon
     - consumable
   - id: 1
-    itemName: zzz
-    description: kamen
+    itemName: money
+    description: money
     icon: {fileID: 21300000, guid: 610318afcd8122147a60308df2df058f, type: 3}
-    isStackable: 0
+    isStackable: 1
     categories: []
   - id: 2
     itemName: poisona
@@ -33,7 +32,6 @@ MonoBehaviour:
     icon: {fileID: 21300000, guid: 84c45a74014ac744d9a0c1d0fab4e7d1, type: 3}
     isStackable: 1
     categories:
-    - weapon
     - consumable
   - id: 3
     itemName: sword
@@ -42,3 +40,10 @@ MonoBehaviour:
     isStackable: 0
     categories:
     - weapon
+  - id: 4
+    itemName: masterkey
+    description: masterkey
+    icon: {fileID: 21300000, guid: 4eeca220c36d12a42b24a8832d6cf0b5, type: 3}
+    isStackable: 1
+    categories:
+    - consumable

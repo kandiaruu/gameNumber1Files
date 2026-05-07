@@ -18,4 +18,5 @@ public interface ISkillTreeManager
     void UpgradeSkill(string groupName, int skillIndex); // Новый метод
     void ResetSkillUpgrades(string groupName, int skillIndex);
     void ResetSkillToLevel(string groupName, int skillIndex, int targetLevel);
+    Skill GetSkillByName(string skillName);
 }

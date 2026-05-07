@@ -10,7 +10,6 @@ public enum DoorSideType
 public class DoorPortal : MonoBehaviour
 {
     [HideInInspector] public NodeInstance owner;
-    [HideInInspector] public DoorPortal linked;
     [Header("Direction")]
     public DoorSideType sideType;
 

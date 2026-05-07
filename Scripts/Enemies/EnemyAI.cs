@@ -21,6 +21,7 @@ public class EnemyAI : MonoBehaviour
     public Transform[] critPointSpots;
 
     [InjectAttribute1] public IPlayerStats playerStats { get; set; }
+    [InjectAttribute1] public ILootManager3 lootManager3 { get; set; }
     private float attackCooldown = 0f;
 
     // --- Для rush ("замаха") ---
@@ -87,12 +88,14 @@ public class EnemyAI : MonoBehaviour
 
     private void Die()
     {
-        // if (chestPrefab != null)
-        // {
-        //     Instantiate(chestPrefab, transform.position, Quaternion.identity);
-        // }
+        if (lootManager3 != null)
+        {
+            lootManager3.AddGoblinKill(); 
+        }
         Destroy(gameObject);
     }
+
+    public bool IsAlive => currentHP > 0f; 
 
     void Start()
     {

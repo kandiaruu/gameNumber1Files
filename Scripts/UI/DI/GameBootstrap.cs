@@ -84,6 +84,16 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private LootPanel3 lootPanel3;
     [Dependency(new[] { typeof(ILootInventoryPanel3) }, typeof(InventoryPanel3), Lifecycle.Singleton)]
     [SerializeField] private InventoryPanel3 inventoryLootPanel3;
+    [Dependency(new[] { typeof(IEnemySpawner) }, typeof(EnemySpawner), Lifecycle.Singleton, typeof(IPlayerStats))]
+    [SerializeField] private EnemySpawner enemySpawner;
+    [Dependency(new[] { typeof(DungeonVisibilityManager) }, typeof(DungeonVisibilityManager), Lifecycle.Singleton, typeof(IThirdPersonCharacter), typeof(IEnemySpawner))]
+    [SerializeField] private DungeonVisibilityManager visibilityManager;
+    [Dependency(new[] { typeof(IDungeonFloorManager) }, typeof(DungeonFloorManager), Lifecycle.Singleton)]
+    [SerializeField] private DungeonFloorManager dungeonFloorManager;
+    [Dependency(new[] { typeof(IGameplaySkillManager) }, typeof(GameplaySkillManager), Lifecycle.Singleton)]
+    [SerializeField] private GameplaySkillManager gameplaySkillManager;
+    [Dependency(new[] { typeof(ISkillEquipManager) }, typeof(SkillEquipManager), Lifecycle.Singleton)]
+    [SerializeField] private SkillEquipManager skillEquipManager;
 
     private static FieldInfo[] _dependencyFields;
     private static FieldInfo[] _allFields;

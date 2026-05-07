@@ -16,7 +16,6 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
     private bool dragStartedInContainer = false;
 
     [InjectAttribute1] private IUIManager uiManager { get; set; }
-    [InjectAttribute1] private ISkillPanelManager skillPanelManager { get; set; }
 
     private struct PanelStateData
     {
@@ -25,7 +24,7 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
     }
     private Dictionary<SkillPanelManager.SkillPanelState, PanelStateData> panelStates = new();
 
-    public Skill LastSkill; // Stores the last selected skill
+    public Skill LastSkill;
 
     private void Awake()
     {
@@ -42,7 +41,6 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 
         bool isMouseOverContainer = RectTransformUtility.RectangleContainsScreenPoint(skillTreeContainer, Input.mousePosition);
 
-        // Проверяем, разрешена ли навигация (зум и перетаскивание)
         bool allowNavigation = uiManager.ShouldAllowNavigation();
 
         if (allowNavigation && isMouseOverContainer)
@@ -73,13 +71,20 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
         {
             Vector3 delta = Input.mousePosition - dragOrigin;
             dragOrigin = Input.mousePosition;
-            Vector2 newPosition = skillHolder.anchoredPosition + new Vector2(delta.x, delta.y);
+
+            // Читаем DPI (чувствительность) из настроек
+            float dpiMultiplier = PlayerPrefs.GetFloat("SkillTreeDragDPI", 1f);
+
+            // Умножаем дельту мышки на DPI
+            Vector2 moveDelta = new Vector2(delta.x * dpiMultiplier, delta.y * dpiMultiplier);
+            
+            Vector2 newPosition = skillHolder.anchoredPosition + moveDelta;
             skillHolder.anchoredPosition = ClampPosition(newPosition);
         }
     }
     public void CenterOnSkill(Skill skill)
     {
-        LastSkill = skill; // Сохраняем последний выбранный навык
+        LastSkill = skill;
         if (skill == null || skill.skillButton == null)
         {
             Debug.LogWarning("Навык или его кнопка не назначены!");

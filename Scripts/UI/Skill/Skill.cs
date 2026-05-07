@@ -3,11 +3,32 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
 
+public enum SkillCategory { Active, Passive } // Убрали Stat
+
+[System.Serializable]
+public class SkillLevelData
+{
+    [Header("Бонусы к урону (для Пассивок)")]
+    public float flatDamageBonus;       // Плоский урон (например, 20)
+    public float percentDamageBonus;    // Процентный урон (например, 0.1 это +10%)
+    public float maxPercentDamageBonus; // Итоговый мультипликатор (например, 0.1 это +10% ко ВСЕМУ)
+
+    [Header("Эффекты при попадании (для Пассивок)")]
+    public float effectDamage;          // Урон от поджога/яда в секунду
+    public float effectDuration;        // Длительность эффекта в секундах
+}
+
 [System.Serializable]
 public class Skill
 {
     public string skillName;
     public int skillIndex;
+    public SkillCategory category;      // Тип навыка
+    public List<string> tags;           // Теги (например: "Magic", "Fire")
+    public SkillLevelData[] levelStats; // Настройки для каждого уровня (размер должен совпадать с maxUpgrades)
+    public Sprite skillIcon;
+    public GameObject skillPrefab;      
+    public AudioClip castSound;    
     public int cost;
     public bool isUnlocked;
     public int[] prerequisiteIndices;

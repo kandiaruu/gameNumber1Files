@@ -4,7 +4,10 @@ public class ThirdPersonCamera : MonoBehaviour
 {
     [SerializeField] private Transform target;
     [SerializeField] private Vector3 fpvOffset = new Vector3(0f, 1.7f, 0.1f); // Head position
+    
+    [Tooltip("Базовая чувствительность мыши")]
     [SerializeField] private float mouseSensitivity = 1.2f;
+    
     [SerializeField] private float pitchMin = -60f;
     [SerializeField] private float pitchMax = 80f;
     public bool isSettingsOpen = false;
@@ -38,8 +41,13 @@ public class ThirdPersonCamera : MonoBehaviour
         float mouseX = Input.GetAxisRaw("Mouse X");
         float mouseY = Input.GetAxisRaw("Mouse Y");
 
-        yaw += mouseX * mouseSensitivity;
-        pitch = Mathf.Clamp(pitch - mouseY * mouseSensitivity, pitchMin, pitchMax);
+        // <--- ДОБАВЛЕНО: Читаем множитель из настроек меню --->
+        float sensitivityMultiplier = PlayerPrefs.GetFloat("MouseSensitivity", 1f);
+        float finalSensitivity = mouseSensitivity * sensitivityMultiplier;
+
+        // Применяем итоговую чувствительность
+        yaw += mouseX * finalSensitivity;
+        pitch = Mathf.Clamp(pitch - mouseY * finalSensitivity, pitchMin, pitchMax);
     }
 
     private void UpdateCamera()

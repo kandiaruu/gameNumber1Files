@@ -356,4 +356,10 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
 
         Debug.Log($"Навык {skill.skillName} сброшен до уровня {targetLevel}. Возвращено {goldToReturn} золота.");
     }
+
+        // <--- ДОБАВИТЬ МЕТОД ПОИСКА НАВЫКА
+    public Skill GetSkillByName(string skillName)
+    {
+        return GetAllSkills().FirstOrDefault(s => s.skillName == skillName);
+    }
 }

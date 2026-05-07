@@ -189,6 +189,11 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
             int randomStack = UnityEngine.Random.Range(1, 11);
             TryAddItem(3, randomStack);
         }
+        if (Input.GetKeyDown(KeyCode.Alpha8))
+        {
+            int randomStack = UnityEngine.Random.Range(1, 11);
+            TryAddItem(4, randomStack);
+        }
     }
 
     private void ToggleSortAsc()
@@ -352,6 +357,20 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         if (scrollRect != null)
             scrollRect.verticalNormalizedPosition = 1f;
     }
+
+    public bool HasItem(int itemId, int amount = 1)
+    {
+        int total = 0;
+        foreach (var item in savedItems)
+        {
+            if (item.itemId == itemId)
+            {
+                total += item.stackSize;
+            }
+        }
+        return total >= amount;
+    }
+
     public void RebuildSlots()
     {
         ResetScroll();

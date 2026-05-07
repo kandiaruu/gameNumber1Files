@@ -25,16 +25,30 @@ public class LootPanel3 : BasePanel, IPanel
     public override void Open()
     {
         int kills = lootManager3.PendingGoblinKills();
-        if (kills <= 0)
-        {
-            // если лута нет — просто не открываем
-            return;
-        }
+        int chests = lootManager3.PendingChestOpens();
+
+        // Если лута нет вообще
+        if (kills <= 0 && chests <= 0) return;
 
         base.Open();
 
         if (killedText != null)
-            killedText.text = $"Вы убили гоблина {kills} раз";
+        {
+            // Формируем текст в зависимости от того, что было собрано
+            if (chests > 0 && kills == 0)
+            {
+                killedText.text = $"You opened {chests} chests. Lets see what have you got";
+            }
+            else if (kills > 0 && chests == 0)
+            {
+                killedText.text = $"You have killed: {kills} goblins";
+            }
+            else
+            {
+                // Если игрок собрал и сундуки, и гоблинов одновременно
+                killedText.text = $"You have killed: {kills} goblins, You opened: {chests} chests. Lets see what have you got";
+            }
+        }
 
         if (lootInventoryPanel != null)
             lootInventoryPanel.SetItemsRaw(lootManager3.GetPendingLoot());

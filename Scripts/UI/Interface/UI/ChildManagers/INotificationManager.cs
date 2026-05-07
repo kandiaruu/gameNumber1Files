@@ -4,4 +4,5 @@ public interface INotificationManager
     bool IsNotificationActive();
     void CloseNotification();
     void ShowNotification(Skill skill, int dependentCount, System.Action onConfirm); // Новый метод
+    void ShowMessage(string message);
 }

@@ -8,4 +8,7 @@ public interface IInventoryPanel3
     void ToggleSortNone();
     void SetSearchQuery(string query);
     void AddItemsFromList(List<InvItemDatabase3> items);
+    bool HasItem(int itemId, int amount = 1);
+    void ClearItem(int itemId, int stackSize);
+    bool TryAddItem(int itemId, int stackSize);
 }

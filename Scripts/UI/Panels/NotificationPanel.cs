@@ -38,6 +38,21 @@ public class SkillNotificationPanel : BasePanel, ISkillNotificationPanel
         levelSlider.onValueChanged.AddListener(OnSliderValueChanged);
     }
 
+    public void ShowMessage(string message)
+    {
+        Open();
+        ClearButtons();
+
+        // Убеждаемся, что ползунок от сброса навыков выключен
+        if (levelSlider != null) levelSlider.gameObject.SetActive(false);
+        if (sliderValueText != null) sliderValueText.gameObject.SetActive(false);
+
+        notificationText.text = message;
+        
+        // Добавляем единственную кнопку для закрытия
+        AddButton("Закрыть", Close);
+    }
+
     public void ShowNotification(Skill skill, ISkillTreeManager skillTreeManager = null)
     {
         // Существующий код без изменений

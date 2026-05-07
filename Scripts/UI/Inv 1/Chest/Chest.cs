@@ -10,6 +10,7 @@ public class Chest : MonoBehaviour
 {
     public ChestSize size = ChestSize.Small; 
     public List<ChestItemEntry> chestItems = new List<ChestItemEntry>();
+    public bool isLocked = true; 
     public void Interact(InventoryPanel inventoryPanel)
     {
         inventoryPanel.LoadChestItems(chestItems);

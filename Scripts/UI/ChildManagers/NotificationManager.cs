@@ -68,4 +68,16 @@ public class NotificationManager : MonoBehaviour, INotificationManager
             notificationPanel.Close();
         }
     }
+
+    public void ShowMessage(string message)
+    {
+        if (notificationPanel != null)
+        {
+            notificationPanel.ShowMessage(message);
+        }
+        else
+        {
+            Debug.LogWarning("NotificationPanel не инициализирован!");
+        }
+    }
 }
