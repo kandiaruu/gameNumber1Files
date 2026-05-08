@@ -1,3 +1,7 @@
+//
+// Handles the display and lifecycle of skill notifications shown to the player
+//
+
 using UnityEngine;
 
 public class SkillNotificationHandler : MonoBehaviour, ISkillNotificationHandler
@@ -5,6 +9,9 @@ public class SkillNotificationHandler : MonoBehaviour, ISkillNotificationHandler
     [InjectAttribute1] private INotificationManager notificationManager { get; set; }
     public bool skillNotificationPanelActive { get; set; } = false;
 
+    //
+    // Displays a notification for the given skill if notification manager is available
+    //
     public void ShowNotification(Skill skill)
     {
         if (notificationManager == null)
@@ -17,15 +24,20 @@ public class SkillNotificationHandler : MonoBehaviour, ISkillNotificationHandler
         Debug.Log("Notification panel shown, skillNotificationPanelActive set to true");
     }
 
+    //
+    // Marks the notification panel as closed
+    //
     public void OnNotificationPanelClosed()
     {
         skillNotificationPanelActive = false;
         Debug.Log("Notification panel closed, skillNotificationPanelActive set to false");
     }
 
+    //
+    // Monitors if notification panel has been closed externally and resets flag accordingly
+    //
     private void Update()
     {
-        // Fallback: If the notification panel is no longer active but the flag is still true, reset it
         if (skillNotificationPanelActive && notificationManager != null && !notificationManager.IsNotificationActive())
         {
             skillNotificationPanelActive = false;

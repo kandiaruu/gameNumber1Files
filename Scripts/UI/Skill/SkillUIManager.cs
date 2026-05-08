@@ -1,3 +1,7 @@
+//
+// Manages UI display and updates for the skill system, including skill points, gold, and button states
+//
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -14,8 +18,11 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
     [InjectAttribute1] private IUIManager uiManager { get; set; }
     private Dictionary<string, ColorBlock[]> originalColorBlocks;
-    private bool lastButtonState = true; // Для отслеживания изменений состояния
+    private bool lastButtonState = true;
 
+    //
+    // Initializes dependencies and validates UI elements on awake
+    //
     void Awake()
     {
         DependencyContainer1.InjectDependencies(this);
@@ -23,6 +30,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         InitializeUI();
     }
 
+    //
+    // Sets up button listeners and event subscriptions for skill updates
+    //
     void Start()
     {
         if (SkillLogicManager == null) throw new System.NullReferenceException("SkillLogicManager is not injected!");
@@ -37,20 +47,21 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
             SkillLogicManager.ResetQuestionsAndGold();
         });
 
-        SkillLogicManager.OnSkillPointsChanged += points => skillPointsText.text = $"Очки навыков: {points}";
-        SkillLogicManager.OnGoldChanged += gold => goldText.text = $"Золото: {gold}";
+        SkillLogicManager.OnSkillPointsChanged += points => skillPointsText.text = $"Skill Points: {points}";
+        SkillLogicManager.OnGoldChanged += gold => goldText.text = $"Gold: {gold}";
         SkillLogicManager.OnSkillsUpdated += RefreshAllSkills;
 
         DisableButtonColorChange();
-        UpdateButtonState(); // Проверка состояния при старте
+        UpdateButtonState();
     }
 
+    //
+    // Updates button interactability based on UI manager state
+    //
     void Update()
     {
-        // Проверяем, разрешено ли взаимодействие с кнопками
         bool allowInteraction = uiManager.ShouldAllowSkillButtonInteraction();
 
-        // Обновляем состояние кнопок только если оно изменилось
         if (allowInteraction != lastButtonState)
         {
             EnableSkillButtons(allowInteraction);
@@ -58,6 +69,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         }
     }
 
+    //
+    // Validates that all required UI elements are assigned
+    //
     private void ValidateUIElements()
     {
         if (skillPointsText == null) throw new System.NullReferenceException("SkillPointsText is not assigned!");
@@ -66,6 +80,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         if (resetQuestionsButton == null) throw new System.NullReferenceException("ResetQuestionsButton is not assigned!");
     }
 
+    //
+    // Initializes UI with skill data and stores original color blocks for buttons
+    //
     private void InitializeUI()
     {
         var allSkills = SkillLogicManager?.GetAllSkills();
@@ -96,11 +113,14 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
             }
         }
 
-        skillPointsText.text = $"Очки навыков: {SkillLogicManager.GetSkillPoints()}";
-        goldText.text = $"Золото: {SkillLogicManager.GetGold()}";
+        skillPointsText.text = $"Skill points: {SkillLogicManager.GetSkillPoints()}";
+        goldText.text = $"Gold: {SkillLogicManager.GetGold()}";
         RefreshAllSkills();
     }
 
+    //
+    // Disables button color changes by setting all state colors to normal
+    //
     private void DisableButtonColorChange()
     {
         var allSkills = SkillLogicManager?.GetAllSkills();
@@ -120,6 +140,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         }
     }
 
+    //
+    // Updates button state based on UI manager permissions
+    //
     private void UpdateButtonState()
     {
         bool allowInteraction = uiManager.ShouldAllowSkillButtonInteraction();
@@ -127,6 +150,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         lastButtonState = allowInteraction;
     }
 
+    //
+    // Refreshes all skill UI elements based on current state
+    //
     public void RefreshAllSkills()
     {
         if (SkillLogicManager == null) return;
@@ -141,6 +167,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         }
     }
 
+    //
+    // Finds the group name that contains the given skill
+    //
     private string GetGroupNameForSkill(Skill skill)
     {
         var skillGroups = SkillLogicManager.GetSkillGroups();
@@ -153,6 +182,9 @@ public class SkillUIManager : MonoBehaviour, ISkillUIManager
         return string.Empty;
     }
 
+    //
+    // Enables or disables all skill buttons and applies appropriate color states
+    //
     public void EnableSkillButtons(bool enable)
     {
         if (SkillLogicManager == null || originalColorBlocks == null) return;

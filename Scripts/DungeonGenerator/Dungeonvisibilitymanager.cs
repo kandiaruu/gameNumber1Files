@@ -1,3 +1,10 @@
+//
+// DungeonVisibilityManager controls which dungeon rooms are visible at any given time.
+// On a configurable interval it determines which room the player is standing in,
+// spawns enemies on first entry, and activates only the current room, the previous
+// room, and all immediate neighbors. It also marks rooms as discovered on the minimap.
+//
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,94 +12,78 @@ public class DungeonVisibilityManager : MonoBehaviour
 {
     [InjectAttribute1] public IThirdPersonCharacter Player { get; set; }
     [InjectAttribute1] public IEnemySpawner EnemySpawner { get; set; }
-    [SerializeField] private float checkInterval = 0.2f; // как часто проверять комнату игрока (сек)
-    [SerializeField] private float boundsPadding = 1.5f; // запас при проверке — игрок должен выйти дальше этого от краёв комнаты чтобы она перестала считаться текущей
+    [SerializeField] private float checkInterval = 0.2f;
+    [SerializeField] private float boundsPadding = 1.5f;
     [HideInInspector] public Transform currentMapContainer;
 
-    // Все комнаты данжа
     private List<NodeInstance> allRooms = new();
-
-    // Закэшированные bounds для каждой комнаты (считаются один раз после RegisterRooms)
     private readonly Dictionary<NodeInstance, Bounds> roomBoundsCache = new();
 
-    // Текущая комната игрока
-    // DungeonVisibilityManager.cs
-
     private NodeInstance currentRoom;
-    private NodeInstance previousRoom; // Добавьте это поле для хранения "истории"
+    private NodeInstance previousRoom;
 
     private float timer;
 
-    // ─────────────────────────────────────────
-    // Публичное API
-    // ─────────────────────────────────────────
+    // Injects dependencies via the dependency container
     private void Start()
     {
-        // Инициализируем зависимости через ваш контейнер[cite: 9]
         DependencyContainer1.InjectDependencies(this);
     }
 
-    /// Вызови из DungeonBuilder после окончания генерации.
-public void RegisterRooms(List<NodeInstance> rooms)
-{
-    allRooms.Clear();
-    allRooms.AddRange(rooms);
-
-    // СБРОС: Менеджер должен забыть про комнаты старого этажа
-    currentRoom = null;
-    previousRoom = null;
-
-    roomBoundsCache.Clear();
-    foreach (var room in allRooms)
+    // Replaces the room list with the given set, clears previous state, and pre-computes the renderer-based bounds for each room
+    public void RegisterRooms(List<NodeInstance> rooms)
     {
-        if (room != null)
+        allRooms.Clear();
+        allRooms.AddRange(rooms);
+
+        currentRoom = null;
+        previousRoom = null;
+
+        roomBoundsCache.Clear();
+        foreach (var room in allRooms)
         {
-            roomBoundsCache[room] = CalculateRoomBounds(room);
+            if (room != null)
+            {
+                roomBoundsCache[room] = CalculateRoomBounds(room);
+            }
         }
     }
-}
 
-private Bounds CalculateRoomBounds(NodeInstance room)
-{
-    // ДОБАВЛЕН ПАРАМЕТР true
-    Renderer[] renderers = room.GetComponentsInChildren<Renderer>(true);
-    
-    if (renderers.Length == 0)
+    // Computes the combined Renderer bounds for all children of a room, including inactive ones; returns a minimal bounds if none are found
+    private Bounds CalculateRoomBounds(NodeInstance room)
     {
-        return new Bounds(room.transform.position, Vector3.one * 2f);
+        Renderer[] renderers = room.GetComponentsInChildren<Renderer>(true);
+
+        if (renderers.Length == 0)
+        {
+            return new Bounds(room.transform.position, Vector3.one * 2f);
+        }
+
+        Bounds b = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            b.Encapsulate(renderers[i].bounds);
+        }
+
+        return b;
     }
 
-    Bounds b = renderers[0].bounds;
-    for (int i = 1; i < renderers.Length; i++)
-    {
-        b.Encapsulate(renderers[i].bounds);
-    }
-
-    return b;
-}
-    /// Вызови из ChainGenerator.Interact() сразу после телепорта игрока,
-    /// чтобы видимость обновилась мгновенно без задержки.
+    // Resets the check timer and immediately refreshes room visibility after a player teleport
     public void NotifyPlayerTeleported()
     {
         timer = 0f;
         RefreshVisibility();
     }
 
-    // ─────────────────────────────────────────
-    // Unity
-    // ─────────────────────────────────────────
-
-// DungeonVisibilityManager.cs[cite: 18]
-
-// Метод для обновления папки карты при смене этажа
+    // Updates the map container reference used when discovering rooms on the minimap
     public void SetCurrentMapContainer(Transform newMapFolder)
     {
         currentMapContainer = newMapFolder;
     }
 
+    // On a regular interval, refreshes room visibility and marks the current room as discovered on the minimap
     private void Update()
     {
-        // Проверяем наличие игрока через свойство, установленное DI
         if (Player == null || allRooms.Count == 0) return;
 
         timer -= Time.deltaTime;
@@ -107,20 +98,14 @@ private Bounds CalculateRoomBounds(NodeInstance room)
         }
     }
 
-    // ─────────────────────────────────────────
-    // Основная логика
-    // ─────────────────────────────────────────
-
+    // Detects the player's current room, spawns enemies on first entry, and applies the visibility set if the room has changed
     private void RefreshVisibility()
     {
-        // Получаем позицию через трансформ игрока (нужно убедиться, что IThirdPersonCharacter дает доступ к нему)
         Transform pTransform = ((MonoBehaviour)Player).transform;
         NodeInstance detected = DetectCurrentRoom(pTransform.position);
-        
+
         if (detected == null || detected == currentRoom) return;
 
-        // ЛОГИКА СПАВНА ВРАГА
-        // Проверяем: не начальная комната, еще не спавнили, и есть точка спавна
         if (detected.kind != RoomKind.Start && !detected.hasSpawnedEnemy)
         {
             if (detected.spawnPoint != null && EnemySpawner != null)
@@ -136,6 +121,7 @@ private Bounds CalculateRoomBounds(NodeInstance room)
         ApplyVisibility(currentRoom);
     }
 
+    // Checks each room's padded bounds to find the one containing the player; falls back to the closest room by center distance
     private NodeInstance DetectCurrentRoom(Vector3 pos)
     {
         foreach (var room in allRooms)
@@ -146,8 +132,7 @@ private Bounds CalculateRoomBounds(NodeInstance room)
         return FindClosestRoom(pos);
     }
 
-    /// Считает объединённый Bounds всех рендереров комнаты.
-    /// Вызывается один раз при RegisterRooms и кэшируется.
+    // Computes combined Renderer bounds for a room using only active renderers (legacy version used alongside CalculateRoomBounds)
     private Bounds CalcRoomBounds(NodeInstance room)
     {
         Renderer[] renderers = room.GetComponentsInChildren<Renderer>();
@@ -161,18 +146,17 @@ private Bounds CalculateRoomBounds(NodeInstance room)
         return b;
     }
 
+    // Returns true if the position falls within the cached bounds of a room expanded by the padding margin
     private bool IsInsideRoom(NodeInstance room, Vector3 pos)
     {
         if (!roomBoundsCache.TryGetValue(room, out Bounds b)) return false;
 
-        // Расширяем bounds на padding — игрок должен уйти дальше этого расстояния
-        // от краёв чтобы комната перестала считаться текущей
         Bounds padded = b;
         padded.Expand(boundsPadding);
         return padded.Contains(pos);
     }
 
-    /// Фолбэк: ближайшая комната по центру bounds (не по pivot'у GameObject'а).
+    // Returns the room whose cached bounds center is closest to the given position
     private NodeInstance FindClosestRoom(Vector3 pos)
     {
         NodeInstance closest = null;
@@ -195,26 +179,22 @@ private Bounds CalculateRoomBounds(NodeInstance room)
         return closest;
     }
 
-    /// Показывает текущую комнату + всех соседей, прячет всё остальное.
+    // Activates the current room, the previous room, and all neighbors; deactivates every other room
     private void ApplyVisibility(NodeInstance room)
     {
         HashSet<NodeInstance> visible = new();
-        
-        // 1. Текущая комната
+
         visible.Add(room);
 
-        // 2. Предыдущая (для плавности перехода, как у тебя и было)
         if (previousRoom != null)
             visible.Add(previousRoom);
 
-        // 3. ВСЕ соседи (теперь это работает железно)
         foreach (var neighbour in room.neighbors)
         {
             if (neighbour != null)
                 visible.Add(neighbour);
         }
 
-        // Применяем результат
         foreach (var r in allRooms)
         {
             if (r == null) continue;
@@ -222,20 +202,16 @@ private Bounds CalculateRoomBounds(NodeInstance room)
         }
     }
 
-    // ─────────────────────────────────────────
-    // Утилиты
-    // ─────────────────────────────────────────
-
+    // Sets every room in the list to the given active state
     private void SetAllVisible(bool visible)
     {
         foreach (var room in allRooms)
             if (room != null) SetRoomVisible(room, visible);
     }
 
+    // Sets a single room's GameObject active state, disabling its renderers, colliders, and scripts when hidden
     private void SetRoomVisible(NodeInstance room, bool visible)
     {
-        // Включаем/выключаем весь GameObject комнаты.
-        // Это отключает рендеры, коллайдеры и скрипты — максимальная экономия.
         room.gameObject.SetActive(visible);
     }
 }

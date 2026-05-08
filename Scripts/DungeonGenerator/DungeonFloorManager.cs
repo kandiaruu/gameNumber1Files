@@ -1,14 +1,23 @@
+//
+// DungeonFloorManager orchestrates multi-floor dungeon sessions.
+// It tracks the current floor number, manages per-floor GameObject folders,
+// shows/hides floors and the overworld, teleports the player to the start room,
+// and coordinates the DungeonBuilder and DungeonVisibilityManager.
+// Public methods allow entering, advancing, retreating, resuming, and exiting
+// a dungeon run, all wrapped in coroutines that display a loading screen.
+//
+
 using System.Collections.Generic;
-using System.Collections; // Нужно для IEnumerator
+using System.Collections;
 using UnityEngine;
 
 public class DungeonFloorManager : MonoBehaviour, IDungeonFloorManager
 {
     [Header("Dungeon Settings")]
-    public int maxFloors = 6; // <--- Переменная для хранения длины подземелья
+    public int maxFloors = 6;
     [Header("Roots")]
-    public Transform dungeonSystemRoot; // Папка для этажей
-    public Transform mapContainerRoot;  // Папка для иконок карты
+    public Transform dungeonSystemRoot;
+    public Transform mapContainerRoot;
     [Header("World/Hub")]
     public GameObject worldRoot;
 
@@ -17,52 +26,52 @@ public class DungeonFloorManager : MonoBehaviour, IDungeonFloorManager
     public Transform player;
     public DungeonVisibilityManager visibilityManager;
     private Dictionary<int, List<NodeInstance>> roomsPerFloor = new Dictionary<int, List<NodeInstance>>();
-    
+
     [InjectAttribute1] public IUIManager uiManager { get; set; }
 
     [Header("State")]
-    public int currentFloor = 0; 
-    public bool isInsideDungeon = false; // Флаг: игрок в данже или в мире
-    
+    public int currentFloor = 0;
+    public bool isInsideDungeon = false;
+
     private List<GameObject> floorFolders = new List<GameObject>();
     private List<GameObject> mapFolders = new List<GameObject>();
-    private Vector3 worldReturnPosition; // Координаты портала в мире
+    private Vector3 worldReturnPosition;
 
+    // Injects dependencies and stores the player's initial world position as the return point
     private void Start()
     {
         DependencyContainer1.InjectDependencies(this);
-        // Запоминаем, где стоит игрок в начале (у портала в мире)
-        worldReturnPosition = player.position; 
+        worldReturnPosition = player.position;
     }
 
+    // Returns true if the player is currently inside the dungeon
     public bool IsInsideDungeon => isInsideDungeon;
+
+    // Returns true if at least one floor has been generated or entered
     public bool HasActiveDungeon => currentFloor > 0 || floorFolders.Count > 0;
 
-    // ЭТОТ МЕТОД ВЫЗЫВАЕТСЯ ПРИ НАЖАТИИ НА ПОРТАЛ (DungeonEntryPortal)
+    // Toggles between entering the dungeon and exiting to the world depending on the player's current location
     public void OnPortalInteract()
     {
         if (isInsideDungeon)
         {
-            // Случай А: Игрок нажал портал ВНУТРИ данжа -> Выходим в мир
             ExitToWorld();
         }
         else
         {
-            // Случай Б: Игрок нажал портал в МИРЕ -> Входим в данж
             EnterDungeon();
         }
     }
 
+    // Shows the loading screen, disables the current floor, re-enables the world root, and returns the player to their world position
     private void ExitToWorld()
     {
         uiManager.OpenPanel(UIManager.PanelType.Loading);
 
         isInsideDungeon = false;
-        
-        // Перемещаем игрока к порталу в мире
+
         player.position = worldReturnPosition;
 
-        // НОВОЕ: Включаем стартовую локацию
         if (worldRoot != null)
         {
             worldRoot.SetActive(true);
@@ -77,101 +86,90 @@ public class DungeonFloorManager : MonoBehaviour, IDungeonFloorManager
         uiManager.CloseCurrentPanel();
     }
 
-private void TeleportPlayerToStart()
-{
-    // Получаем актуальный список комнат через метод вашего билдера
-    var rooms = builder.GetSpawnedRooms();
-
-    // Защита от ArgumentOutOfRangeException
-    if (rooms == null || rooms.Count == 0) return;
-
-    // Ищем стартовую комнату в полученном списке
-    NodeInstance startRoom = rooms.Find(r => r.kind == RoomKind.Start);
-    
-    // Если StartRoom найдена - берем её позицию, иначе - позицию самой первой сгенерированной комнаты
-    Vector3 targetPos = (startRoom != null) ? startRoom.transform.position : rooms[0].transform.position;
-
-    // Важно для CharacterController (отключаем на момент телепортации)
-    var cc = player.GetComponent<CharacterController>();
-    if (cc != null) cc.enabled = false;
-    
-    player.position = targetPos + Vector3.up * 1.2f;
-    
-    if (cc != null) cc.enabled = true;
-}
-
-private void SyncSystemsWithCurrentFloor()
-{
-    // Устанавливаем контейнер для карты
-    visibilityManager.currentMapContainer = mapFolders[currentFloor - 1].transform;
-    
-    // Берем список комнат из нашего словаря по номеру этажа
-    if (roomsPerFloor.ContainsKey(currentFloor))
+    // Finds the Start room among the builder's spawned rooms and moves the player there, with CharacterController temporarily disabled
+    private void TeleportPlayerToStart()
     {
-        visibilityManager.RegisterRooms(roomsPerFloor[currentFloor]);
-    }
-}
+        var rooms = builder.GetSpawnedRooms();
 
+        if (rooms == null || rooms.Count == 0) return;
+
+        NodeInstance startRoom = rooms.Find(r => r.kind == RoomKind.Start);
+
+        Vector3 targetPos = (startRoom != null) ? startRoom.transform.position : rooms[0].transform.position;
+
+        var cc = player.GetComponent<CharacterController>();
+        if (cc != null) cc.enabled = false;
+
+        player.position = targetPos + Vector3.up * 1.2f;
+
+        if (cc != null) cc.enabled = true;
+    }
+
+    // Updates the visibility manager's map container and room list to match the current floor
+    private void SyncSystemsWithCurrentFloor()
+    {
+        visibilityManager.currentMapContainer = mapFolders[currentFloor - 1].transform;
+
+        if (roomsPerFloor.ContainsKey(currentFloor))
+        {
+            visibilityManager.RegisterRooms(roomsPerFloor[currentFloor]);
+        }
+    }
+
+    // Destroys all floor and map folders, resets state, and returns the player to the world position
     private void ResetAndExitDungeon()
     {
-        // Полная очистка при завершении 6 уровней[cite: 2, 4]
         foreach (var f in floorFolders) Destroy(f);
         foreach (var m in mapFolders) Destroy(m);
-        
+
         floorFolders.Clear();
         mapFolders.Clear();
         builder.ClearLists();
-        
+
         currentFloor = 0;
         isInsideDungeon = false;
         player.position = worldReturnPosition;
     }
 
+    // Goes back one floor, or exits to the world if already on floor 1
     public void GoToPreviousFloor()
     {
         if (currentFloor <= 1)
         {
-            // Если мы уже на 1-м этаже, то выходим в мир
             ExitToWorld();
             return;
         }
 
         uiManager.OpenPanel(UIManager.PanelType.Loading);
 
-        // Выключаем текущий этаж
         floorFolders[currentFloor - 1].SetActive(false);
         mapFolders[currentFloor - 1].SetActive(false);
 
-        // Уменьшаем счетчик этажа
         currentFloor--;
 
-        // Включаем предыдущий этаж
         floorFolders[currentFloor - 1].SetActive(true);
         mapFolders[currentFloor - 1].SetActive(true);
 
-        // Синхронизируем системы для старого этажа
         SyncSystemsWithCurrentFloor();
         TeleportPlayerToStart();
 
         uiManager.CloseCurrentPanel();
-        Debug.Log($"Спустились обратно на этаж {currentFloor}");
+        Debug.Log($"Returned to floor {currentFloor}");
     }
 
+    // Starts the coroutine that generates and activates the next floor
     public void StartNextFloor()
     {
         StartCoroutine(GenerateFloorRoutine());
     }
 
-    // Основная логика теперь здесь
+    // Coroutine: shows the loading screen, generates a new floor folder if needed, syncs systems, and teleports the player to the start room
     private IEnumerator GenerateFloorRoutine()
     {
-        // 1. Включаем экран загрузки
         uiManager.OpenPanel(UIManager.PanelType.Loading);
 
-        // 2. Ждем до конца кадра, чтобы Unity успела отрисовать UI
         yield return null;
-        
-        // Проверка лимита этажей
+
         if (currentFloor >= maxFloors)
         {
             ResetAndExitDungeon();
@@ -201,9 +199,8 @@ private void SyncSystemsWithCurrentFloor()
             mapRoot.transform.SetParent(mapContainerRoot);
             mapFolders.Add(mapRoot);
 
-            // ТЯЖЕЛАЯ ГЕНЕРАЦИЯ (теперь UI уже на экране)[cite: 2]
             builder.BuildInFolder(floorRoot.transform, mapRoot.transform);
-            
+
             roomsPerFloor[currentFloor] = new List<NodeInstance>(builder.GetSpawnedRooms());
         }
         else
@@ -215,11 +212,11 @@ private void SyncSystemsWithCurrentFloor()
         SyncSystemsWithCurrentFloor();
         TeleportPlayerToStart();
 
-        // 3. Выключаем экран загрузки
         uiManager.CloseCurrentPanel();
         Debug.Log($"Floor {currentFloor} generated with {builder.GetSpawnedRooms().Count} rooms.");
     }
 
+    // Resets the player's Rigidbody velocity and teleports them back to the world return position
     public void RespawnPlayerInWorld()
     {
         if (player != null)
@@ -227,29 +224,27 @@ private void SyncSystemsWithCurrentFloor()
             var rb = player.GetComponent<Rigidbody>();
             if (rb != null)
             {
-                // Сбрасываем инерцию падения перед телепортом
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }
-            
-            player.position = worldReturnPosition; 
+
+            player.position = worldReturnPosition;
         }
     }
 
-    // То же самое для входа в данж
+    // Starts the coroutine that transitions the player from the world into the dungeon
     public void EnterDungeon()
     {
         StartCoroutine(EnterDungeonRoutine());
     }
 
+    // Coroutine: shows the loading screen, hides the world root, then generates floor 1 or re-enters the existing current floor
     private IEnumerator EnterDungeonRoutine()
     {
         uiManager.OpenPanel(UIManager.PanelType.Loading);
-        
-        // Ждем кадр, чтобы UI точно появился
+
         yield return null;
 
-        // НОВОЕ: Выключаем стартовую локацию, пока висит экран загрузки
         if (worldRoot != null)
         {
             worldRoot.SetActive(false);
@@ -269,34 +264,38 @@ private void SyncSystemsWithCurrentFloor()
         }
     }
 
+    // Sets the total floor count and enters the dungeon to begin a new run
     public void StartNewDungeon(int floors)
     {
         maxFloors = floors;
         EnterDungeon();
     }
 
+    // Re-enters the dungeon at the current floor without resetting state
     public void ResumeDungeon()
     {
         EnterDungeon();
     }
 
+    // Exits to the world without destroying dungeon data
     public void ExitDungeonToWorld()
     {
         ExitToWorld();
     }
 
+    // Exits to the world and destroys all dungeon floors and map data
     public void ExitAndDeleteDungeon()
     {
         ResetAndExitDungeon();
-        if (worldRoot != null) worldRoot.SetActive(true); // Включаем мир
+        if (worldRoot != null) worldRoot.SetActive(true);
     }
 
+    // Destroys all dungeon floor and map folders and resets the floor counter while keeping the player in the world
     public void DeleteDungeonFromWorld()
     {
-        // Удаляем подземелье, оставаясь в мире
         foreach (var f in floorFolders) Destroy(f);
         foreach (var m in mapFolders) Destroy(m);
-        
+
         floorFolders.Clear();
         mapFolders.Clear();
         builder.ClearLists();

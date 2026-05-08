@@ -1,3 +1,10 @@
+//
+// Tracks pending loot from goblin kills and chest openings. Each kill adds a fixed
+// set of items; each chest open adds items according to per-item random drop chances
+// and quantity ranges. Loot accumulates in an internal list until consumed, at which
+// point the list and kill/open counters are reset.
+//
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,12 +13,16 @@ using UnityEngine;
 public class LootManager3 : MonoBehaviour, ILootManager3
 {
     private int goblinKills = 0;
-    private int chestOpens = 0; // <--- ДОБАВЛЕНО
+    private int chestOpens = 0;
     private readonly List<InvItemDatabase3> pendingLoot = new();
 
+    // Returns the number of goblin kills that have not yet been consumed
     public int PendingGoblinKills() => goblinKills;
-    public int PendingChestOpens() => chestOpens; // <--- ДОБАВЛЕНО
 
+    // Returns the number of chest opens that have not yet been consumed
+    public int PendingChestOpens() => chestOpens;
+
+    // Records a goblin kill and queues a fixed loot reward into the pending list
     public void AddGoblinKill()
     {
         goblinKills++;
@@ -20,36 +31,34 @@ public class LootManager3 : MonoBehaviour, ILootManager3
         AddLoot(2, 10);
     }
 
-    // <--- ДОБАВЛЕНО: Логика сундуков с рандомом --->
+    // Records a chest open and queues randomly determined loot drops based on per-item chances and quantity ranges
     public void AddChestOpen()
     {
         chestOpens++;
 
-        // Предмет ID 1: Шанс 20% (0.2f), количество от 1 до 10
         if (UnityEngine.Random.value <= 0.20f)
         {
-            int randomAmount = UnityEngine.Random.Range(1, 11); // Максимум не включителен, поэтому 11
+            int randomAmount = UnityEngine.Random.Range(1, 11);
             AddLoot(1, randomAmount);
         }
 
-        // Предмет ID 2: Шанс 50% (0.5f), количество 1
         if (UnityEngine.Random.value <= 0.50f)
         {
             AddLoot(2, 1);
         }
 
-        // Предмет ID 3: Шанс 33% (0.33f), количество 1
         if (UnityEngine.Random.value <= 0.33f)
         {
             AddLoot(3, 1);
         }
     }
 
+    // Adds the given quantity of an item to the pending loot list, stacking onto an existing entry if one exists
     private void AddLoot(int itemId, int count)
     {
         long now = DateTime.UtcNow.Ticks;
         var existing = pendingLoot.FirstOrDefault(i => i.itemId == itemId);
-        
+
         if (existing != null)
         {
             existing.stackSize += count;
@@ -68,6 +77,7 @@ public class LootManager3 : MonoBehaviour, ILootManager3
         }
     }
 
+    // Returns a snapshot copy of the current pending loot list without clearing it
     public List<InvItemDatabase3> GetPendingLoot()
     {
         return pendingLoot.Select(i => new InvItemDatabase3
@@ -79,12 +89,13 @@ public class LootManager3 : MonoBehaviour, ILootManager3
         }).ToList();
     }
 
+    // Returns the pending loot list and then clears it along with the kill and chest open counters
     public List<InvItemDatabase3> ConsumePendingLoot()
     {
         var result = GetPendingLoot();
         pendingLoot.Clear();
         goblinKills = 0;
-        chestOpens = 0; // Сбрасываем сундуки тоже
+        chestOpens = 0;
         return result;
     }
 }

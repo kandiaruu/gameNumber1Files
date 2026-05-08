@@ -65,7 +65,7 @@ PrefabInstance:
       addedObject: {fileID: 907242093953987707}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 594c45cd72ba89042867ea2ae5af0ff6, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 2712218147690905056}
+      addedObject: {fileID: 873099373428839166}
   m_SourcePrefab: {fileID: 100100000, guid: 594c45cd72ba89042867ea2ae5af0ff6, type: 3}
 --- !u!1 &5132908326983114714 stripped
 GameObject:
@@ -93,7 +93,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2.016192, y: 1.9430853, z: 2.0378554}
   m_Center: {x: 0.0036551952, y: 0.003655374, z: -0.00000011920929}
---- !u!114 &2712218147690905056
+--- !u!114 &873099373428839166
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -102,8 +102,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 5132908326983114714}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7547ff01a8c57404f969c355922faf80, type: 3}
+  m_Script: {fileID: 11500000, guid: ec8a3abe24fce85418f126c072a42c67, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  size: 1
-  chestItems: []
+  isLocked: 1

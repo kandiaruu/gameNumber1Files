@@ -1,3 +1,10 @@
+//
+// ThirdPersonCharacter controls the player in a third-person Unity game. It handles
+// movement, sprinting, jumping, melee attacks, skill casting (e.g. fireballs),
+// environment interaction (chests, doors, portals, merchants), ground detection,
+// camera-aligned rotation, and animator/audio integration.
+//
+
 using UnityEngine;
 using System.Linq;
 using System.Collections.Generic;
@@ -16,66 +23,67 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
     private bool isGrounded;
 
     private static readonly Vector3 GroundCheckOffset = Vector3.up * 0.1f;
-    [SerializeField] private Animator animator; // добавили
+    [SerializeField] private Animator animator;
     [SerializeField] private DamagePopupSpawner damagePopupSpawner;
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip swordSwingSound;
     [SerializeField] private AudioClip swordHitSound;
-    [SerializeField] private AudioClip castSound; 
-    [Header("Магия")]
-    [SerializeField] private GameObject fireballPrefab;     // Префаб файрбола
-    [SerializeField] private Transform firePoint;   
+    [SerializeField] private AudioClip castSound;
+    [Header("Magic")]
+    [SerializeField] private GameObject fireballPrefab;
+    [SerializeField] private Transform firePoint;
 
     [SerializeField] private ChainGenerator dungeonGenerator;
     [SerializeField] private float interactDistance = 10f;
     private Dictionary<string, float> skillCooldowns = new Dictionary<string, float>();
 
     [InjectAttribute1] private IUIManager uiManager { get; set; }
-    [InjectAttribute1] private IChestUIController chestUIController { get; set; }
-    [InjectAttribute1] private IInventoryPanel3 inventoryPanel3 { get; set; } 
-    [InjectAttribute1] private ISkillTreeManager skillTreeManager { get; set; } // <--- ДОБАВЛЕНО
+    [InjectAttribute1] private IInventoryPanel3 inventoryPanel3 { get; set; }
+    [InjectAttribute1] private ISkillTreeManager skillTreeManager { get; set; }
     [InjectAttribute1] private IGameplaySkillManager gameplayManager { get; set; }
     [InjectAttribute1] private ISkillEquipManager equipManager { get; set; }
-    [InjectAttribute1] private ILootManager3 lootManager3 { get; set; } // <--- ДОБАВЛЕНО
+    [InjectAttribute1] private ILootManager3 lootManager3 { get; set; }
 
+    // Fetches required components (Rigidbody, AudioSource) and logs warnings if any are missing
     private void Awake()
-        {
-            rb = GetComponent<Rigidbody>();
-            if (!rb)
-                Debug.LogError("No Rigidbody component found on " + name);
+    {
+        rb = GetComponent<Rigidbody>();
+        if (!rb)
+            Debug.LogError("No Rigidbody component found on " + name);
 
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
             if (audioSource == null)
             {
-                audioSource = GetComponent<AudioSource>();
-                if (audioSource == null)
-                {
-                    // можно создать или просто написать ошибку
-                    Debug.LogWarning("AudioSource is NULL on " + name + ". " +
-                                    "Добавь компонент AudioSource и привяжи его в инспекторе.");
-                }
+                Debug.LogWarning("AudioSource is NULL on " + name + ". " +
+                                "Add an AudioSource component and assign it in the Inspector.");
             }
-            // 1. Если что-то уже привязано в Inspector — оставляем
         }
+    }
+
+    // Injects all interface dependencies via the dependency container
     private void Start()
     {
         DependencyContainer1.InjectDependencies(this);
     }
 
+    // Called every frame: handles fall damage, attack cooldown, interaction prompt, jumping, melee input, and active skill key input
     private void Update()
     {
         if (transform.position.y <= -100f)
         {
-            playerStats.TakeDamage(99999f, "absolute"); // Мгновенная смерть при падении
+            playerStats.TakeDamage(99999f, "absolute");
         }
 
         attackCooldown -= Time.deltaTime;
         CheckForInteractableAndToggleIcon();
         if (Input.GetKeyDown(KeyCode.E))
         {
-            TryInteract(); // единая точка взаимодействия
+            TryInteract();
         }
-        // Jump handling
+
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             Jump();
@@ -86,15 +94,13 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
             PlayAttackAnimation();
             attackCooldown = 1f / playerStats.AtkSpeed;
         }
-        
+
         if (equipManager != null && equipManager.ActiveSkillKeys != null)
         {
             for (int i = 0; i < equipManager.ActiveSkillKeys.Length; i++)
             {
-                // Если нажали нужную кнопку
                 if (Input.GetKeyDown(equipManager.ActiveSkillKeys[i]))
                 {
-                    // Смотрим, какой скилл лежит в этом слоте
                     Skill skillInSlot = equipManager.EquippedActives[i];
                     if (skillInSlot != null)
                     {
@@ -105,51 +111,41 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
         }
     }
 
-    // Метод выстрела
+    // Validates, calculates damage for, and fires a projectile skill by name, respecting cooldowns and skill level stats
     private void CastSkill(string skillName)
     {
         Skill skill = skillTreeManager?.GetAllSkills()?.FirstOrDefault(s => s.skillName == skillName);
         if (skill == null || !skill.isUnlocked || skill.skillPrefab == null) return;
 
-        // 1. Читаем скрипт с ПРЕФАБА (не создавая его на сцене)
         Fireball prefabScript = skill.skillPrefab.GetComponent<Fireball>();
         if (prefabScript == null || prefabScript.statsPerLevel == null || prefabScript.statsPerLevel.Length == 0) return;
 
-        // Находим нужные статы для текущего уровня
         int levelIndex = Mathf.Min(Mathf.Max(0, skill.currentLevel - 1), prefabScript.statsPerLevel.Length - 1);
         ActiveSkillStats currentStats = prefabScript.statsPerLevel[levelIndex];
 
-        // 2. Проверка кулдауна
         if (skillCooldowns.TryGetValue(skillName, out float cdEndTime))
         {
             if (Time.time < cdEndTime)
             {
-                if (damagePopupSpawner != null) 
-                    damagePopupSpawner.ShowMessage(transform, "Перезарядка...", Color.yellow);
+                if (damagePopupSpawner != null)
+                    damagePopupSpawner.ShowMessage("Reloading...", Color.yellow);
                 return;
             }
         }
 
-        // 3. Проверка Маны (если у вас в IPlayerStats есть мана)
-        /*
-        if (playerStats.Mana < currentStats.manaCost)
+        if (!playerStats.ConsumeMana(currentStats.manaCost))
         {
-            if (damagePopupSpawner != null) 
-                damagePopupSpawner.ShowMessage(transform, "Нет маны!", Color.blue);
+            if (damagePopupSpawner != null)
+                damagePopupSpawner.ShowMessage("Not enough mana!", Color.blue);
             return;
         }
-        playerStats.Mana -= currentStats.manaCost;
-        */
 
-        // 4. Считаем ИТОГОВЫЙ УРОН через наш новый менеджер
         float baseDamage = currentStats.damage;
-        float finalDamage = gameplayManager != null ? 
+        float finalDamage = gameplayManager != null ?
             gameplayManager.CalculateFinalDamage(baseDamage, skill.tags) : baseDamage;
 
-        // 5. Ставим кулдаун
         skillCooldowns[skillName] = Time.time + currentStats.cooldown;
 
-        // 6. Выстрел
         if (skill.castSound != null && audioSource != null) audioSource.PlayOneShot(skill.castSound);
 
         Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
@@ -163,43 +159,43 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
         GameObject spawnedProjectile = Instantiate(skill.skillPrefab, spawnPos, Quaternion.identity);
         spawnedProjectile.transform.LookAt(targetPoint);
 
-        // 7. Передаем готовые данные в созданный снаряд
         Fireball spawnedScript = spawnedProjectile.GetComponent<Fireball>();
         if (spawnedScript != null)
         {
             spawnedScript.currentSkillLevel = skill.currentLevel;
-            spawnedScript.calculatedDamage = finalDamage; // <--- Передаем уже финальную цифру!
+            spawnedScript.calculatedDamage = finalDamage;
             spawnedScript.skillTags = skill.tags;
             spawnedScript.gameplayManager = gameplayManager;
         }
     }
 
+    // Animation event callback: plays the sword swing sound when the swing frame is reached
     public void OnSwing()
     {
-        // звук
         if (audioSource != null && swordSwingSound != null)
         {
             audioSource.PlayOneShot(swordSwingSound);
         }
     }
+
+    // Animation event callback: triggers the actual hit detection when the attack animation connects
     public void OnAttackHit()
     {
         TryAttackEnemy();
     }
 
+    // Sets the animator speed to match the player's attack speed stat and triggers the Attack animation
     private void PlayAttackAnimation()
     {
-        //if (animator == null) return;
-
-        // Скорость анимации зависит от AtkSpeed
         Debug.Log("PlayAttackAnimation called");
-        float baseAttackSpeed = 1f; // клип делали под AtkSpeed = 1
+        float baseAttackSpeed = 1f;
         float animSpeed = Mathf.Max(0.1f, playerStats.AtkSpeed / baseAttackSpeed);
         animator.speed = animSpeed;
 
         animator.SetTrigger("Attack");
     }
 
+    // Raycasts from the screen centre to detect enemies; applies critical or normal damage depending on what was hit
     private void TryAttackEnemy()
     {
         Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
@@ -215,7 +211,6 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
 
         foreach (var hit in hits)
         {
-            // Сначала ищем CritPoint
             if (hit.collider.CompareTag("CritPoint"))
             {
                 var critMarker = hit.collider.GetComponent<CritPointMarker>();
@@ -231,17 +226,15 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
                     damagePopupSpawner.ShowDamage(critMarker.owner.transform, dmg, true, DamageType.Pure);
                     Debug.Log("Critical Hit!");
                     critHit = true;
-                    break; // Сразу выходим — крит приоритетнее обычного
+                    break;
                 }
             }
-            // Запоминаем обычного врага, если не было крита
             else if (hit.collider.CompareTag("Enemy") && !critHit)
             {
                 hitEnemy = hit.collider.GetComponent<EnemyAI>();
             }
         }
 
-        // Если не было крита, но попали по врагу — обычный урон
         if (!critHit && hitEnemy != null)
         {
             if (audioSource != null && swordHitSound != null)
@@ -255,181 +248,171 @@ public class ThirdPersonCharacter : MonoBehaviour, IThirdPersonCharacter
         }
     }
 
-private void CheckForInteractableAndToggleIcon()
-{
-    Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
-    Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
-
-    bool lookingAtInteractable = false;
-
-    if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
+    // Raycasts from the screen centre and shows or hides the E-key interaction icon based on whether an interactable object is in range
+    private void CheckForInteractableAndToggleIcon()
     {
-        // Вход в данж из обычного мира
-        if (hit.collider.GetComponentInParent<DungeonEntrance>() != null)
-            lookingAtInteractable = true;
-        // Двери данжа
-        else if (hit.collider.GetComponentInParent<DoorInteractable>() != null)
-            lookingAtInteractable = true;
-        // Сундуки
-        else if (hit.collider.GetComponentInParent<Chest>() != null)
-            lookingAtInteractable = true;
-        else if (hit.collider.GetComponentInParent<BossRoomPortal>() != null)
-            lookingAtInteractable = true;
-        else if (hit.collider.GetComponentInParent<BackBossRoomPortal>() != null)
-            lookingAtInteractable = true;
-        else if (hit.collider.GetComponentInParent<MerchantNPC>() != null)
-            lookingAtInteractable = true;
-    }
+        Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
+        Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
 
-    if (eKeyIcon != null)
-        eKeyIcon.SetActive(lookingAtInteractable);
-}
+        bool lookingAtInteractable = false;
 
-private void TryInteract()
-{
-    Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
-    Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
-
-    if (!Physics.Raycast(ray, out RaycastHit hit, interactDistance))
-    {
-        Debug.Log("[Player] TryInteract: raycast missed");
-        return;
-    }
-
-    Debug.Log("[Player] Hit: " + hit.collider.name);
-
-    var merchant = hit.collider.GetComponentInParent<MerchantNPC>();
-    if (merchant != null)
-    {
-        if (uiManager != null)
+        if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
-            // Открываем панель торговца (убедитесь, что название совпадает с вашим enum в UIManager)
-            uiManager.OpenPanel(UIManager.PanelType.MerchantPanel);
-        }
-        return; 
-    }
-
-    var interactable = hit.collider.GetComponentInParent<DoorInteractable>();
-    if (interactable != null && interactable.portal != null)
-    {
-        if (interactable.portal.owner != null)
-        {
-            var enemiesInRoom = interactable.portal.owner.GetComponentsInChildren<EnemyAI>();
-            foreach (var enemy in enemiesInRoom)
-            {
-                if (enemy.IsAlive)
-                {
-                    // Вызываем всплывающий текст прямо над дверью (красным цветом)
-                    if (damagePopupSpawner != null)
-                    {
-                        damagePopupSpawner.ShowMessage(interactable.transform, "Убейте всех врагов!", Color.red);
-                    }
-                    return; 
-                }
-            }
+            if (hit.collider.GetComponentInParent<DungeonEntrance>() != null)
+                lookingAtInteractable = true;
+            else if (hit.collider.GetComponentInParent<DoorInteractable>() != null)
+                lookingAtInteractable = true;
+            else if (hit.collider.GetComponentInParent<Chest>() != null)
+                lookingAtInteractable = true;
+            else if (hit.collider.GetComponentInParent<BossRoomPortal>() != null)
+                lookingAtInteractable = true;
+            else if (hit.collider.GetComponentInParent<BackBossRoomPortal>() != null)
+                lookingAtInteractable = true;
+            else if (hit.collider.GetComponentInParent<MerchantNPC>() != null)
+                lookingAtInteractable = true;
         }
 
-        dungeonGenerator.Interact(interactable.portal, hit.collider);
-        return;
+        if (eKeyIcon != null)
+            eKeyIcon.SetActive(lookingAtInteractable);
     }
 
-    var chest = hit.collider.GetComponentInParent<Chest>();
-    if (chest != null)
+    // Raycasts from the screen centre and delegates to the appropriate handler for the object hit (merchant, door, chest, portal, dungeon entrance)
+    private void TryInteract()
     {
-        if (chest.isLocked)
+        Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
+        Ray ray = cameraController.GetComponent<Camera>().ScreenPointToRay(screenCenter);
+
+        if (!Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
-            if (inventoryPanel3 != null && inventoryPanel3.HasItem(4, 1))
+            Debug.Log("[Player] TryInteract: raycast missed");
+            return;
+        }
+
+        Debug.Log("[Player] Hit: " + hit.collider.name);
+
+        var merchant = hit.collider.GetComponentInParent<MerchantNPC>();
+        if (merchant != null)
+        {
+            if (uiManager != null)
             {
-                inventoryPanel3.ClearItem(4, 1); 
-                chest.isLocked = false;    
-                if (lootManager3 != null)
-                {
-                    lootManager3.AddChestOpen();
-                    uiManager.OpenPanel(UIManager.PanelType.Inventory3);
-                }      
-            }
-            else
-            {
-                if (damagePopupSpawner != null)
-                    damagePopupSpawner.ShowMessage(chest.transform, "Нужна отмычка!", Color.red);
+                uiManager.OpenPanel(UIManager.PanelType.MerchantPanel);
             }
             return;
         }
 
-        if (damagePopupSpawner != null)
-            damagePopupSpawner.ShowMessage(chest.transform, "В сундуке ничего нет!", Color.red);
-        return;
-    }
-
-    // 4 Teleporter
-        // 4 Teleporter
-    var bossPortal = hit.collider.GetComponentInParent<BossRoomPortal>();
-    if (bossPortal != null)
-    {
-        // <--- ДОБАВЛЕНО: Проверка жив ли босс
-        var currentRoom = bossPortal.GetComponentInParent<NodeInstance>();
-        if (currentRoom != null)
+        var interactable = hit.collider.GetComponentInParent<DoorInteractable>();
+        if (interactable != null && interactable.portal != null)
         {
-            var enemiesInRoom = currentRoom.GetComponentsInChildren<EnemyAI>();
-            foreach (var enemy in enemiesInRoom)
+            if (interactable.portal.owner != null)
             {
-                if (enemy.IsAlive)
+                var enemiesInRoom = interactable.portal.owner.GetComponentsInChildren<EnemyAI>();
+                foreach (var enemy in enemiesInRoom)
                 {
-                    // Босс всё ещё жив! Показываем сообщение и прерываем телепортацию
-                    if (damagePopupSpawner != null)
+                    if (enemy.IsAlive)
                     {
-                        damagePopupSpawner.ShowMessage(bossPortal.transform, "Сначала победите босса!", Color.red);
+                        if (damagePopupSpawner != null)
+                        {
+                            damagePopupSpawner.ShowMessage("Kill all enemies!", Color.red);
+                        }
+                        return;
                     }
-                    return; 
                 }
             }
-        }
-        // --->
 
-        // Если дошли сюда — босс мёртв (или его не было), телепортируемся!
-        var floorManager = FindFirstObjectByType<DungeonFloorManager>();
-        if (floorManager != null)
-        {
-            floorManager.StartNextFloor();
+            dungeonGenerator.Interact(interactable.portal, hit.collider);
+            return;
         }
-        return;
-    }
-    
-    var backBossPortal = hit.collider.GetComponentInParent<BackBossRoomPortal>();
-    if (backBossPortal != null)
-    {
-        var floorManager = FindFirstObjectByType<DungeonFloorManager>();
-        if (floorManager != null)
-        {
-            floorManager.GoToPreviousFloor();
-        }
-        return;
-    }
-    
-    var entryPortal = hit.collider.GetComponent<DungeonEntrance>();
-    if (entryPortal != null)
-    {
-        var floorManager = FindFirstObjectByType<DungeonFloorManager>();
-        if (floorManager != null)
-        {
-            // Вызываем умный метод переключения[cite: 4]
-            uiManager.OpenPanel(UIManager.PanelType.DungeonEntry);
-        }
-        return;
-    }
-}
 
+        var chest = hit.collider.GetComponentInParent<Chest>();
+        if (chest != null)
+        {
+            if (chest.isLocked)
+            {
+                if (inventoryPanel3 != null && inventoryPanel3.HasItem(4, 1))
+                {
+                    inventoryPanel3.ClearItem(4, 1);
+                    chest.isLocked = false;
+                    if (lootManager3 != null)
+                    {
+                        lootManager3.AddChestOpen();
+                        uiManager.OpenPanel(UIManager.PanelType.Inventory3);
+                    }
+                }
+                else
+                {
+                    if (damagePopupSpawner != null)
+                        damagePopupSpawner.ShowMessage("You need a lockpick!", Color.red);
+                }
+                return;
+            }
+
+            if (damagePopupSpawner != null)
+                damagePopupSpawner.ShowMessage("The chest is empty!", Color.red);
+            return;
+        }
+
+        var bossPortal = hit.collider.GetComponentInParent<BossRoomPortal>();
+        if (bossPortal != null)
+        {
+            var currentRoom = bossPortal.GetComponentInParent<NodeInstance>();
+            if (currentRoom != null)
+            {
+                var enemiesInRoom = currentRoom.GetComponentsInChildren<EnemyAI>();
+                foreach (var enemy in enemiesInRoom)
+                {
+                    if (enemy.IsAlive)
+                    {
+                        if (damagePopupSpawner != null)
+                        {
+                            damagePopupSpawner.ShowMessage("Defeat the boss first!", Color.red);
+                        }
+                        return;
+                    }
+                }
+            }
+
+            var floorManager = FindFirstObjectByType<DungeonFloorManager>();
+            if (floorManager != null)
+            {
+                floorManager.StartNextFloor();
+            }
+            return;
+        }
+
+        var backBossPortal = hit.collider.GetComponentInParent<BackBossRoomPortal>();
+        if (backBossPortal != null)
+        {
+            var floorManager = FindFirstObjectByType<DungeonFloorManager>();
+            if (floorManager != null)
+            {
+                floorManager.GoToPreviousFloor();
+            }
+            return;
+        }
+
+        var entryPortal = hit.collider.GetComponent<DungeonEntrance>();
+        if (entryPortal != null)
+        {
+            var floorManager = FindFirstObjectByType<DungeonFloorManager>();
+            if (floorManager != null)
+            {
+                uiManager.OpenPanel(UIManager.PanelType.DungeonEntry);
+            }
+            return;
+        }
+    }
+
+    // Called every physics step: checks if the player is grounded, reads input, moves, and rotates to match the camera
     private void FixedUpdate()
     {
-        // Ground check
         isGrounded = Physics.Raycast(transform.position + GroundCheckOffset, Vector3.down, groundCheckDistance + 0.1f);
 
-        // Handle movement relative to camera yaw
         Vector3 inputDirection = GetInputDirection();
         Move(inputDirection);
         RotateWithCamera();
     }
 
+    // Returns the normalised horizontal input direction from the WASD / arrow keys
     private Vector3 GetInputDirection()
     {
         return new Vector3(
@@ -439,6 +422,7 @@ private void TryInteract()
         ).normalized;
     }
 
+    // Moves the rigidbody in the camera-relative direction at walk or sprint speed, preserving vertical velocity
     private void Move(Vector3 inputDirection)
     {
         float deltaTime = Time.fixedDeltaTime;
@@ -453,15 +437,16 @@ private void TryInteract()
         rb.linearVelocity = new Vector3(velocity.x, rb.linearVelocity.y, velocity.z);
     }
 
+    // Rotates the player on the Y axis to always face the same direction as the camera
     private void RotateWithCamera()
     {
         if (cameraController == null) return;
-        // Always face the direction the camera is looking (Y axis only)
         Vector3 euler = transform.eulerAngles;
         euler.y = cameraController.transform.eulerAngles.y;
         transform.eulerAngles = euler;
     }
 
+    // Applies an upward impulse force to make the player jump and marks the player as airborne
     private void Jump()
     {
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);

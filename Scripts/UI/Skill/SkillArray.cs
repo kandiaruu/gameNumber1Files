@@ -1,3 +1,7 @@
+//
+// Represents a group of skills and handles their initialization and UI updates
+//
+
 using Unity.VisualScripting;
 using UnityEngine;
 
@@ -7,6 +11,10 @@ public class SkillGroup
     public string groupName;
     public Skill[] skills;
     public GameObject lineParentObject;
+
+    //
+    // Initializes all skills in the group and sets up dependency lines
+    //
     public void Initialize()
     {
         foreach (Skill skill in skills)
@@ -21,6 +29,9 @@ public class SkillGroup
         }
     }
 
+    //
+    // Updates UI for all skills in the group based on affordability
+    //
     public void UpdateUI(bool canAfford)
     {
         foreach (Skill skill in skills)

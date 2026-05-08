@@ -4,6 +4,12 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
 
+//
+// Entry point for the game's dependency injection system.
+// Declares all MonoBehaviour dependencies via [Dependency] attributes,
+// then registers, instantiates, and injects them through DependencyContainer1 on Awake.
+//
+
 public class GameBootstrap : MonoBehaviour
 {
     [Dependency(new[] { typeof(ISkillTreeManager) }, typeof(SkillLogicManager), Lifecycle.Singleton, typeof(ISkillUIManager))]
@@ -44,8 +50,6 @@ public class GameBootstrap : MonoBehaviour
 
     [Dependency(new[] { typeof(ISkillTree) }, typeof(SkillTree), Lifecycle.Singleton, typeof(ISkillPanelManager))]
     [SerializeField] private SkillTree skillTree;
-    [Dependency(new[] { typeof(IInventory) }, typeof(Inventory), Lifecycle.Singleton, typeof(ITooltipManager), typeof(IInventoryPanel), typeof(IChestUIController))]
-    [SerializeField] private Inventory inventory;
 
     [Dependency(new[] { typeof(ISkillGuiManager) }, typeof(SkillGuiManager), Lifecycle.Singleton, typeof(ISkillTreeManager), typeof(ISkillGuiPanel), typeof(IUIManager))]
     [SerializeField] private SkillGuiManager skillGuiManager;
@@ -53,45 +57,39 @@ public class GameBootstrap : MonoBehaviour
     [Dependency(new[] { typeof(ISkillGuiPanel) }, typeof(SkillGuiPanel), Lifecycle.Singleton)]
     [SerializeField] private SkillGuiPanel skillGuiPanel;
 
-    [Dependency(new[] { typeof(IItemInfoManager) }, typeof(ItemInfoManager), Lifecycle.Singleton, typeof(IUIManager))]
-    [SerializeField] private ItemInfoManager itemInfoManager;
-    [Dependency(new[] { typeof(IInventoryPanel) }, typeof(InventoryPanel), Lifecycle.Singleton)]
-    [SerializeField] private InventoryPanel inventoryPanel;
-    [Dependency(new[] { typeof(IChestPanel) }, typeof(InventoryPanel), Lifecycle.Singleton)]
-    [SerializeField] private InventoryPanel chestPanel;
-    [Dependency(new[] { typeof(IStashPanel) }, typeof(InventoryPanel), Lifecycle.Singleton)]
-    [SerializeField] private InventoryPanel stashPanel;
-    [Dependency(new[] { typeof(IInventoryPanelsManager) }, typeof(InventoryPanelsManager), Lifecycle.Singleton)]
-    [SerializeField] private InventoryPanelsManager panelsManager;
-    [Dependency(new[] { typeof(IStashManager) }, typeof(StashManager), Lifecycle.Singleton)]
-    [SerializeField] private StashManager stashManager;
-
-    [Dependency(new[] { typeof(IThirdPersonCharacter) }, typeof(ThirdPersonCharacter), Lifecycle.Singleton, typeof(IUIManager), typeof(IChestUIController))]
+    [Dependency(new[] { typeof(IThirdPersonCharacter) }, typeof(ThirdPersonCharacter), Lifecycle.Singleton, typeof(IUIManager))]
     [SerializeField] private ThirdPersonCharacter thirdPersonCharacter;
-    [Dependency(new[] { typeof(IChestUIController) }, typeof(ChestUIController), Lifecycle.Singleton)]
-    [SerializeField] private ChestUIController chestUIController;
+
     [Dependency(new[] { typeof(IPlayerStats) }, typeof(PlayerStats), Lifecycle.Singleton)]
     [SerializeField] private PlayerStats playerStats;
-    [Dependency(new[] { typeof(IInventoryPanel2) }, typeof(InventoryPanel2), Lifecycle.Singleton)]
-    [SerializeField] private InventoryPanel2 inventoryPanel2;
+
     [Dependency(new[] { typeof(IInventoryPanel3) }, typeof(InventoryPanel3), Lifecycle.Singleton)]
     [SerializeField] private InventoryPanel3 inventoryPanel3;
+
     [Dependency(new[] { typeof(IInventorySearch3) }, typeof(InventorySearch3), Lifecycle.Singleton)]
     [SerializeField] private InventorySearch3 inventorySearch3;
+
     [Dependency(new[] { typeof(ILootManager3) }, typeof(LootManager3), Lifecycle.Singleton)]
     [SerializeField] private LootManager3 lootManager3;
+
     [Dependency(new[] { typeof(IPanel) }, typeof(LootPanel3), Lifecycle.Singleton)]
     [SerializeField] private LootPanel3 lootPanel3;
+
     [Dependency(new[] { typeof(ILootInventoryPanel3) }, typeof(InventoryPanel3), Lifecycle.Singleton)]
     [SerializeField] private InventoryPanel3 inventoryLootPanel3;
+
     [Dependency(new[] { typeof(IEnemySpawner) }, typeof(EnemySpawner), Lifecycle.Singleton, typeof(IPlayerStats))]
     [SerializeField] private EnemySpawner enemySpawner;
+
     [Dependency(new[] { typeof(DungeonVisibilityManager) }, typeof(DungeonVisibilityManager), Lifecycle.Singleton, typeof(IThirdPersonCharacter), typeof(IEnemySpawner))]
     [SerializeField] private DungeonVisibilityManager visibilityManager;
+
     [Dependency(new[] { typeof(IDungeonFloorManager) }, typeof(DungeonFloorManager), Lifecycle.Singleton)]
     [SerializeField] private DungeonFloorManager dungeonFloorManager;
+
     [Dependency(new[] { typeof(IGameplaySkillManager) }, typeof(GameplaySkillManager), Lifecycle.Singleton)]
     [SerializeField] private GameplaySkillManager gameplaySkillManager;
+
     [Dependency(new[] { typeof(ISkillEquipManager) }, typeof(SkillEquipManager), Lifecycle.Singleton)]
     [SerializeField] private SkillEquipManager skillEquipManager;
 
@@ -100,6 +98,7 @@ public class GameBootstrap : MonoBehaviour
     private static readonly Dictionary<string, Delegate> _methodCache = new Dictionary<string, Delegate>();
     private static readonly HashSet<Type> _registeredTypes = new HashSet<Type>();
 
+    // Bootstraps the entire DI system: registers types, sets up instances, and injects all dependencies
     void Awake()
     {
         if (_dependencyFields == null)
@@ -113,6 +112,7 @@ public class GameBootstrap : MonoBehaviour
         InjectDependencies();
     }
 
+    // Reads all [Dependency] attributes and registers each interface-to-implementation mapping in the container
     private void RegisterAllDependencies()
     {
         _registeredTypes.Clear();
@@ -167,6 +167,7 @@ public class GameBootstrap : MonoBehaviour
         }
     }
 
+    // Creates any missing MonoBehaviour instances and registers all serialized instances as singletons
     private void SetupDependencies()
     {
         foreach (var field in _dependencyFields)
@@ -228,6 +229,7 @@ public class GameBootstrap : MonoBehaviour
         }
     }
 
+    // Runs property injection on every registered instance and calls EnsureDependencies if it exists
     private void InjectDependencies()
     {
         var allInstances = new HashSet<MonoBehaviour>();
@@ -265,6 +267,7 @@ public class GameBootstrap : MonoBehaviour
         }
     }
 
+    // Returns all fields on this class that have a [Dependency] attribute
     private FieldInfo[] GetDependencyFields()
     {
         return GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
@@ -272,6 +275,7 @@ public class GameBootstrap : MonoBehaviour
             .ToArray();
     }
 
+    // Returns all fields on this class that have a [SerializeField] attribute
     private FieldInfo[] GetAllFields()
     {
         return GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
@@ -279,6 +283,7 @@ public class GameBootstrap : MonoBehaviour
             .ToArray();
     }
 
+    // Clears all singleton and scoped registrations when the bootstrap object is destroyed
     void OnDestroy()
     {
         DependencyContainer1.ClearSingletons();

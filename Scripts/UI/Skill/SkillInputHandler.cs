@@ -1,3 +1,7 @@
+//
+// Handles player input for skill interactions including hovering, clicking, and tooltip management
+//
+
 using UnityEngine;
 using UnityEngine.EventSystems;
 using System.Linq;
@@ -21,12 +25,18 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
     private Coroutine hoverCoroutine;
     private GameObject panelSelection;
 
+    //
+    // Initializes dependencies and sets up skill input handlers
+    //
     private void Start()
     {
         DependencyContainer1.InjectDependencies(this);
         InitializeSkills();
     }
 
+    //
+    // Processes mouse input for dragging and tooltip visibility
+    //
     private void Update()
     {
         if (Input.GetMouseButtonDown(0))
@@ -53,10 +63,13 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
         }
         if (Input.GetKeyDown(KeyCode.S))
         {
-            skillPanelManager.toggleSelection(); // Переключаем панель выбора
+            skillPanelManager.toggleSelection();
         }
     }
 
+    //
+    // Sets up event triggers and click handlers for all skills
+    //
     private void InitializeSkills()
     {
         var skills = skillTreeManager.GetAllSkills();
@@ -74,23 +87,23 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
                 AddEventTrigger(trigger, EventTriggerType.PointerEnter, () => OnPointerEnter(skill));
                 AddEventTrigger(trigger, EventTriggerType.PointerExit, OnPointerExit);
 
-                skill.skillButton.onClick.RemoveAllListeners(); // Очищаем старые слушатели
+                skill.skillButton.onClick.RemoveAllListeners();
                 skill.skillButton.onClick.AddListener(() =>
                 {
                     float pressDuration = Time.unscaledTime - pressStartTime;
-                    if (pressDuration <= clickThreshold) // Проверяем, что это клик, а не удержание
+                    if (pressDuration <= clickThreshold)
                     {   
                         if (skillPanelManager.GetCurrentPanelName() == "Hidden")
                         {
-                            skillTreeNavigation.inputLastSkill(skill); // Передаем навык в менеджер панели
+                            skillTreeNavigation.inputLastSkill(skill);
                         }
                         if (skill.isUnlocked && skillGuiManager != null)
                         {
-                            skillGuiManager.ShowSkillGui(skill); // Показываем SkillGui для разблокированного навыка
+                            skillGuiManager.ShowSkillGui(skill);
                         }
                         else if (!skill.isUnlocked && notificationHandler != null)
                         {
-                            notificationHandler.ShowNotification(skill); // Существующая логика для заблокированных навыков
+                            notificationHandler.ShowNotification(skill);
                         }
                     }
                 });
@@ -98,6 +111,9 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
         }
     }
 
+    //
+    // Adds an event trigger callback to an event trigger component
+    //
     private void AddEventTrigger(EventTrigger trigger, EventTriggerType type, System.Action action)
     {
         var entry = new EventTrigger.Entry { eventID = type };
@@ -105,6 +121,9 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
         trigger.triggers.Add(entry);
     }
 
+    //
+    // Handles pointer enter event with delayed tooltip display
+    //
     public void OnPointerEnter(Skill skill)
     {
         if (hoverCoroutine != null)
@@ -113,9 +132,12 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
         hoverCoroutine = StartCoroutine(DelayedTooltip(skill));
     }
     
+    //
+    // Displays tooltip after a delay if conditions are met
+    //
     private IEnumerator DelayedTooltip(Skill skill)
     {
-        yield return new WaitForSecondsRealtime(0.05f); // задержка в 0.2 секунды
+        yield return new WaitForSecondsRealtime(0.05f);
 
         panelSelection = uiManager.GetPanel(UIManager.PanelType.Selection); 
         string currentGroup = skillPanelManager?.GetCurrentPanelName();
@@ -145,6 +167,9 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
         }
     }
 
+    //
+    // Handles pointer exit event and hides the tooltip
+    //
     public void OnPointerExit()
     {
         if (hoverCoroutine != null)
@@ -156,7 +181,9 @@ public class SkillInputHandler : MonoBehaviour, ISkillInputHandler
         tooltipManager.HideTooltip();
     }
 
-
+    //
+    // Checks if any skill is under the cursor after dragging stops
+    //
     private void CheckHoverAfterDrag()
     {
         string currentGroup = skillPanelManager?.GetCurrentPanelName();;

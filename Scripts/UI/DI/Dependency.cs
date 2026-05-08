@@ -1,5 +1,11 @@
 using System;
 
+//
+// Defines the [Dependency] attribute used to declare DI registrations on GameBootstrap fields,
+// and the Lifecycle enum controlling instance reuse behavior.
+//
+
+// Declares a field as a dependency registration, specifying interface types, implementation, lifecycle, and transitive dependencies
 [AttributeUsage(AttributeTargets.Field)]
 public class DependencyAttribute : Attribute
 {
@@ -8,6 +14,7 @@ public class DependencyAttribute : Attribute
     public Lifecycle Lifecycle { get; }
     public Type[] Dependencies { get; }
 
+    // Validates that the implementation type satisfies all declared interfaces and stores the registration metadata
     public DependencyAttribute(Type[] interfaceTypes, Type implementationType, Lifecycle lifecycle, params Type[] dependencies)
     {
         InterfaceTypes = interfaceTypes ?? throw new ArgumentNullException(nameof(interfaceTypes));
@@ -15,7 +22,6 @@ public class DependencyAttribute : Attribute
         Lifecycle = lifecycle;
         Dependencies = dependencies ?? new Type[0];
 
-        // Проверка, что реализация соответствует всем интерфейсам
         foreach (var interfaceType in InterfaceTypes)
         {
             if (!interfaceType.IsAssignableFrom(implementationType))
@@ -26,6 +32,7 @@ public class DependencyAttribute : Attribute
     }
 }
 
+// Controls how long a resolved instance lives within the container
 public enum Lifecycle
 {
     Singleton,

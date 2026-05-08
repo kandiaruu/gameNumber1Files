@@ -1,3 +1,10 @@
+//
+// Manages the inventory UI panel: builds and rebuilds the slot grid, handles item
+// addition/removal, category filtering, text search, multi-mode sorting (amount,
+// name, date), equipped-item highlighting, and a right-click context menu that
+// lets the player equip or unequip weapons via PlayerWeaponController.
+//
+
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
@@ -25,7 +32,6 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
     private List<InvItemDatabase3> savedItems = new List<InvItemDatabase3>();
 
     private List<InventorySlot3> slots = new List<InventorySlot3>();
-    private GameObject heldIcon;
     [SerializeField] private Canvas uiCanvas;
     [Header("Colors")]
     [SerializeField] private Color highlightColor = new Color(1f, 1f, 0f, 0.5f);
@@ -34,7 +40,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
     [SerializeField] private Button allButton;
     [SerializeField] private Button weaponButton;
     [SerializeField] private Button consumableButton;
-    private string activeCategory = ""; // "" = все
+    private string activeCategory = "";
     [Header("Category Icons")]
     [SerializeField] private Image allIcon;
     [SerializeField] private Image weaponIcon;
@@ -48,13 +54,13 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
     [SerializeField] private Image sortAscIcon;
     [SerializeField] private Image sortDescIcon;
     [Header("Name Sort Buttons")]
-    [SerializeField] private Button sortNameAscButton;   // A-Z
-    [SerializeField] private Button sortNameDescButton;  // Z-A
+    [SerializeField] private Button sortNameAscButton;
+    [SerializeField] private Button sortNameDescButton;
     [SerializeField] private Image sortNameAscIcon;
     [SerializeField] private Image sortNameDescIcon;
     [Header("Date Sort Buttons")]
-    [SerializeField] private Button sortDateAscButton;   // старые -> новые
-    [SerializeField] private Button sortDateDescButton;  // новые -> старые
+    [SerializeField] private Button sortDateAscButton;
+    [SerializeField] private Button sortDateDescButton;
     [SerializeField] private Image sortDateAscIcon;
     [SerializeField] private Image sortDateDescIcon;
     [Header("Context Menu")]
@@ -72,6 +78,8 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
     private enum DateSortMode { None, Asc, Desc }
     private DateSortMode dateSortMode = DateSortMode.None;
     private string searchQuery = "";
+
+    // Initialises the inventory grid and registers all button click listeners
     private void Start()
     {
         SetupInventory(0, gridColumns);
@@ -156,15 +164,13 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
                 EventSystem.current.SetSelectedGameObject(null);
             });
         }
-            
+
         UpdateSortIcons();
     }
 
+    // Handles debug hotkeys for adding/clearing items
     private void Update()
     {
-        if (heldIcon != null)
-            heldIcon.transform.position = Input.mousePosition;
-
         if (Input.GetKeyDown(KeyCode.Alpha2))
         {
             int randomStack = UnityEngine.Random.Range(1, 11);
@@ -196,6 +202,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         }
     }
 
+    // Toggles ascending sort by stack size, then rebuilds the slot grid
     private void ToggleSortAsc()
     {
         amountSortMode = (amountSortMode == AmountSortMode.Asc) ? AmountSortMode.None : AmountSortMode.Asc;
@@ -203,14 +210,15 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         RebuildSlots();
     }
 
+    // Toggles descending sort by stack size, then rebuilds the slot grid
     private void ToggleSortDesc()
     {
         amountSortMode = (amountSortMode == AmountSortMode.Desc) ? AmountSortMode.None : AmountSortMode.Desc;
-
         UpdateSortIcons();
         RebuildSlots();
     }
 
+    // Resets all sort modes to none and rebuilds the slot grid
     public void ToggleSortNone()
     {
         amountSortMode = AmountSortMode.None;
@@ -220,6 +228,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         RebuildSlots();
     }
 
+    // Toggles ascending alphabetical sort by item name, then rebuilds the slot grid
     private void ToggleNameAsc()
     {
         nameSortMode = (nameSortMode == NameSortMode.Asc) ? NameSortMode.None : NameSortMode.Asc;
@@ -227,6 +236,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         RebuildSlots();
     }
 
+    // Toggles descending alphabetical sort by item name, then rebuilds the slot grid
     private void ToggleNameDesc()
     {
         nameSortMode = (nameSortMode == NameSortMode.Desc) ? NameSortMode.None : NameSortMode.Desc;
@@ -234,6 +244,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         RebuildSlots();
     }
 
+    // Toggles ascending sort by date added (oldest first), then rebuilds the slot grid
     private void ToggleDateAsc()
     {
         dateSortMode = (dateSortMode == DateSortMode.Asc) ? DateSortMode.None : DateSortMode.Asc;
@@ -241,6 +252,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         RebuildSlots();
     }
 
+    // Toggles descending sort by date added (newest first), then rebuilds the slot grid
     private void ToggleDateDesc()
     {
         dateSortMode = (dateSortMode == DateSortMode.Desc) ? DateSortMode.None : DateSortMode.Desc;
@@ -248,6 +260,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         RebuildSlots();
     }
 
+    // Updates the tint color of every sort icon to reflect the currently active sort modes
     private void UpdateSortIcons()
     {
         if (sortAscIcon != null)
@@ -269,6 +282,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
             sortDateDescIcon.color = (dateSortMode == DateSortMode.Desc) ? activeColor : inactiveColor;
     }
 
+    // Clears the active category filter and shows all items
     public void ShowAll()
     {
         activeCategory = "";
@@ -276,6 +290,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         UpdateCategoryIcons();
     }
 
+    // Filters the displayed slots to the given category, or reverts to all if the same category is selected again
     public void FilterByCategory(string category)
     {
         if (activeCategory == category)
@@ -290,6 +305,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         }
     }
 
+    // Updates the tint color of each category icon to highlight the currently active filter
     private void UpdateCategoryIcons()
     {
         if (allIcon != null)
@@ -297,16 +313,18 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
 
         if (weaponIcon != null)
             weaponIcon.color = activeCategory == "weapon" ? activeColor : inactiveColor;
-        
+
         if (consumableIcon != null)
             consumableIcon.color = activeCategory == "consumable" ? activeColor : inactiveColor;
     }
 
+    // Generates a unique instance ID for a new inventory item
     private string GenerateInstanceId()
     {
         return Guid.NewGuid().ToString("N");
     }
 
+    // Saves the current state of all occupied slots into the savedItems list
     public void SaveInventoryState()
     {
         savedItems.Clear();
@@ -328,23 +346,27 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         }
     }
 
+    // Restores the inventory display from the savedItems list
     public void LoadInventoryState()
     {
         RebuildSlots();
     }
 
+    // Configures the number of grid columns and triggers an initial slot rebuild
     public void SetupInventory(int slotCount, int columns)
     {
         gridColumns = Mathf.Max(1, columns);
         RebuildSlots();
     }
 
+    // Updates the active search query and rebuilds the slot grid to reflect the new filter
     public void SetSearchQuery(string query)
     {
         searchQuery = query ?? "";
         RebuildSlots();
     }
 
+    // Adds all items from the provided list to the inventory, respecting stacking rules
     public void AddItemsFromList(List<InvItemDatabase3> items)
     {
         if (items == null) return;
@@ -352,12 +374,15 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         foreach (var i in items)
             TryAddItem(i.itemId, i.stackSize);
     }
+
+    // Resets the scroll view to the top
     private void ResetScroll()
     {
         if (scrollRect != null)
             scrollRect.verticalNormalizedPosition = 1f;
     }
 
+    // Returns true if the inventory contains at least the specified amount of the given item
     public bool HasItem(int itemId, int amount = 1)
     {
         int total = 0;
@@ -371,6 +396,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         return total >= amount;
     }
 
+    // Destroys all current slot objects and recreates them after applying category filter, sorting, and search query
     public void RebuildSlots()
     {
         ResetScroll();
@@ -379,7 +405,6 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
                 Destroy(slot.gameObject);
         slots.Clear();
 
-        // Фильтруем список
         List<InvItemDatabase3> filtered = savedItems;
 
         if (!string.IsNullOrEmpty(activeCategory))
@@ -394,7 +419,6 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
             }).ToList();
         }
 
-        // Сортировка по количеству (stackSize)
         if (amountSortMode != AmountSortMode.None)
         {
             if (amountSortMode == AmountSortMode.Asc)
@@ -403,7 +427,6 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
                 filtered = filtered.OrderByDescending(i => i.stackSize).ToList();
         }
 
-        // Сортировки (могут работать вместе)
         IOrderedEnumerable<InvItemDatabase3> ordered = null;
 
         Func<InvItemDatabase3, int> amountKey = i => i.stackSize;
@@ -453,7 +476,6 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         if (ordered != null)
             filtered = ordered.ToList();
 
-        // Поиск по названию (игнор пробелов)
         if (!string.IsNullOrEmpty(searchQuery))
         {
             string q = new string(searchQuery.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToLowerInvariant();
@@ -472,7 +494,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
 
         if (emptyText != null)
             emptyText.SetActive(slotCount == 0);
-            
+
         if (slotCount == 0)
         {
             gridRows = 0;
@@ -485,7 +507,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         {
             float totalHeight = gridRows * cellHeight;
             float totalWidth = gridColumns * cellWidth;
-             
+
             contentRect.sizeDelta = new Vector2(totalWidth, totalHeight);
         }
 
@@ -493,6 +515,7 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
         {
             GameObject slotObj = Instantiate(slotPrefab, slotsParent);
             RectTransform slotRect = slotObj.GetComponent<RectTransform>();
+
             int x = i % gridColumns;
             int y = i / gridColumns;
             slotRect.anchoredPosition = new Vector2(x * cellWidth, -y * cellHeight);
@@ -509,150 +532,134 @@ public class InventoryPanel3 : MonoBehaviour, IInventoryPanel3, ILootInventoryPa
             slotObj.name = $"Slot {x},{y}";
             slots.Add(slot);
 
-            // NEW: подсветка только экипированного предмета
             if (slot.backgroundImage != null)
             {
                 slot.backgroundImage.color = data.isEquipped ? highlightColor : normalColor;
             }
         }
-
-        // if (slot.backgroundImage != null)
-        //     {
-        //         if (!string.IsNullOrEmpty(searchQuery))
-        //         {
-        //             string q = new string(searchQuery.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToLowerInvariant();
-        //             Item3 item = itemDatabase.GetItemById(data.itemId, data.stackSize);
-        //             string name = item != null ? item.itemName ?? "" : "";
-        //             string cleanName = new string(name.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToLowerInvariant();
-
-        //             slot.backgroundImage.color = cleanName.Contains(q)
-        //                 ? highlightColor // highlight
-        //                 : normalColor;  // normal
-        //         }
-        //         else
-        //         {
-        //             slot.backgroundImage.color = normalColor;
-        //         }
-        //     }
     }
 
-public void MarkEquipped(string instanceId)
-{
-    for (int i = 0; i < savedItems.Count; i++)
-        savedItems[i].isEquipped = savedItems[i].instanceId == instanceId;
-
-    RebuildSlots();
-}
-
-public void UnmarkEquipped()
-{
-    for (int i = 0; i < savedItems.Count; i++)
-        savedItems[i].isEquipped = false;
-
-    RebuildSlots();
-}
-
-private long GetNowTicks()
-{
-    return DateTime.UtcNow.Ticks;
-}
-
-public bool TryAddItem(int itemId, int stackSize)
-{
-    Item3 item = itemDatabase.GetItemById(itemId, 1);
-    if (item == null)
+    // Marks a single item as equipped by instance ID and unmarks all others, then rebuilds slots
+    public void MarkEquipped(string instanceId)
     {
-        Debug.LogError($"Не удалось добавить предмет с ID {itemId}: предмет не найден");
-        return false;
+        for (int i = 0; i < savedItems.Count; i++)
+            savedItems[i].isEquipped = savedItems[i].instanceId == instanceId;
+
+        RebuildSlots();
     }
 
-    long now = GetNowTicks();
-
-    if (item.isStackable)
+    // Clears the equipped flag on every saved item, then rebuilds slots
+    public void UnmarkEquipped()
     {
-        var existing = savedItems.FirstOrDefault(i => i.itemId == itemId);
-        if (existing != null)
+        for (int i = 0; i < savedItems.Count; i++)
+            savedItems[i].isEquipped = false;
+
+        RebuildSlots();
+    }
+
+    // Returns the current UTC time as a long tick value
+    private long GetNowTicks()
+    {
+        return DateTime.UtcNow.Ticks;
+    }
+
+    // Attempts to add the specified quantity of an item to the inventory, stacking if possible; returns false if the item is not found
+    public bool TryAddItem(int itemId, int stackSize)
+    {
+        Item3 item = itemDatabase.GetItemById(itemId, 1);
+        if (item == null)
         {
-            existing.stackSize += stackSize;
+            Debug.LogError($"Failed to add item with ID {itemId}: item not found");
+            return false;
+        }
 
-            // даты
-            if (existing.firstAddedTicks == 0)
-                existing.firstAddedTicks = now;
+        long now = GetNowTicks();
 
-            existing.lastAddedTicks = now;
+        if (item.isStackable)
+        {
+            var existing = savedItems.FirstOrDefault(i => i.itemId == itemId);
+            if (existing != null)
+            {
+                existing.stackSize += stackSize;
 
-            // если старый объект без instanceId — дополним
-            if (string.IsNullOrEmpty(existing.instanceId))
-                existing.instanceId = GenerateInstanceId();
+                if (existing.firstAddedTicks == 0)
+                    existing.firstAddedTicks = now;
+
+                existing.lastAddedTicks = now;
+
+                if (string.IsNullOrEmpty(existing.instanceId))
+                    existing.instanceId = GenerateInstanceId();
+            }
+            else
+            {
+                savedItems.Add(new InvItemDatabase3
+                {
+                    instanceId = GenerateInstanceId(),
+                    itemId = itemId,
+                    stackSize = stackSize,
+                    firstAddedTicks = now,
+                    lastAddedTicks = now
+                });
+            }
         }
         else
         {
-            savedItems.Add(new InvItemDatabase3
+            for (int i = 0; i < stackSize; i++)
             {
-                instanceId = GenerateInstanceId(),
-                itemId = itemId,
-                stackSize = stackSize,
-                firstAddedTicks = now,
-                lastAddedTicks = now
-            });
+                savedItems.Add(new InvItemDatabase3
+                {
+                    instanceId = GenerateInstanceId(),
+                    itemId = itemId,
+                    stackSize = 1,
+                    firstAddedTicks = now,
+                    lastAddedTicks = now
+                });
+            }
         }
-    }
-    else
-    {
-        for (int i = 0; i < stackSize; i++)
-        {
-            savedItems.Add(new InvItemDatabase3
-            {
-                instanceId = GenerateInstanceId(),
-                itemId = itemId,
-                stackSize = 1,
-                firstAddedTicks = now,
-                lastAddedTicks = now
-            });
-        }
+
+        RebuildSlots();
+        return true;
     }
 
-    RebuildSlots();
-    return true;
-}
-
-public void SetItemsRaw(List<InvItemDatabase3> raw)
-{
-    savedItems.Clear();
-
-    foreach (var item in raw)
+    // Replaces the entire saved inventory with a raw list, splitting non-stackable items into individual entries
+    public void SetItemsRaw(List<InvItemDatabase3> raw)
     {
-        Item3 def = itemDatabase.GetItemById(item.itemId, 1);
-        if (def == null) continue;
+        savedItems.Clear();
 
-        if (def.isStackable)
+        foreach (var item in raw)
         {
-            savedItems.Add(new InvItemDatabase3
-            {
-                itemId = item.itemId,
-                stackSize = item.stackSize,
-                firstAddedTicks = item.firstAddedTicks,
-                lastAddedTicks = item.lastAddedTicks
-            });
-        }
-        else
-        {
-            for (int i = 0; i < item.stackSize; i++)
+            Item3 def = itemDatabase.GetItemById(item.itemId, 1);
+            if (def == null) continue;
+
+            if (def.isStackable)
             {
                 savedItems.Add(new InvItemDatabase3
                 {
                     itemId = item.itemId,
-                    stackSize = 1,
+                    stackSize = item.stackSize,
                     firstAddedTicks = item.firstAddedTicks,
                     lastAddedTicks = item.lastAddedTicks
                 });
             }
+            else
+            {
+                for (int i = 0; i < item.stackSize; i++)
+                {
+                    savedItems.Add(new InvItemDatabase3
+                    {
+                        itemId = item.itemId,
+                        stackSize = 1,
+                        firstAddedTicks = item.firstAddedTicks,
+                        lastAddedTicks = item.lastAddedTicks
+                    });
+                }
+            }
         }
+
+        RebuildSlots();
     }
 
-    RebuildSlots();
-}
-
+    // Removes the specified quantity of an item from the inventory, respecting stacking rules
     public void ClearItem(int itemId, int stackSize)
     {
         if (IsStackable(itemId))
@@ -683,18 +690,21 @@ public void SetItemsRaw(List<InvItemDatabase3> raw)
         RebuildSlots();
     }
 
+    // Removes all items from the inventory and rebuilds the empty slot grid
     public void ClearAll()
     {
         savedItems.Clear();
         RebuildSlots();
     }
 
+    // Returns true if the item with the given ID is flagged as stackable in the database
     private bool IsStackable(int itemId)
     {
         Item3 item = itemDatabase.GetItemById(itemId, 1);
         return item != null && item.isStackable;
     }
 
+    // Opens the context menu for a clicked slot and wires up equip/unequip and close button logic
     public void OnSlotLeftClick(InventorySlot3 slot)
     {
         if (slot == null || !slot.isOccupied) return;
@@ -715,7 +725,7 @@ public void SetItemsRaw(List<InvItemDatabase3> raw)
         equipButton.gameObject.SetActive(true);
 
         bool thisEquipped = weaponController != null && weaponController.IsEquipped(slot.itemInstanceId);
-        equipButtonLabel.text = thisEquipped ? "Снять" : "Экипировать";
+        equipButtonLabel.text = thisEquipped ? "Unequip" : "Equip";
 
         closeButton.onClick.RemoveAllListeners();
         closeButton.onClick.AddListener(() =>

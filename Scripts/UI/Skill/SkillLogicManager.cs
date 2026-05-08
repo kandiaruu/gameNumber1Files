@@ -1,3 +1,7 @@
+//
+// Core logic manager for the skill tree system, handling skill unlocking, upgrades, and point management
+//
+
 using UnityEngine;
 using System;
 using System.Linq;
@@ -7,21 +11,20 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
 {
     [SerializeField] private SkillGroup[] skillGroups;
 
-    // УБРАТЬ локальные переменные
-    // [SerializeField] private int skillPoints = 3;
-    // [SerializeField] private int gold = 10;
-
     [InjectAttribute1] private ISkillUIManager SkillUIManager { get; set; }
     [InjectAttribute1] private ISkillPanelManager SkillPanelManager { get; set; }
     [InjectAttribute1] private ISkillPanelUI skillPanelUI { get; set; }
     [InjectAttribute1] private INotificationManager notificationManager { get; set; }
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
-    [InjectAttribute1] private IPlayerStats playerStats { get; set; } // <-- ВАЖНО: внедряем IPlayerStats
+    [InjectAttribute1] private IPlayerStats playerStats { get; set; }
 
     public event System.Action<int> OnSkillPointsChanged;
     public event System.Action<int> OnGoldChanged;
     public event System.Action OnSkillsUpdated;
 
+    //
+    // Initializes dependencies and ensures manager persistence
+    //
     void Awake()
     {
         DependencyContainer1.InjectDependencies(this);
@@ -29,6 +32,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         DontDestroyOnLoad(gameObject);
     }
 
+    //
+    // Initializes all skill groups and refreshes the skill UI
+    //
     void Start()
     {
         foreach (var group in skillGroups)
@@ -38,6 +44,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         SkillUIManager?.RefreshAllSkills();
     }
 
+    //
+    // Unlocks a skill if prerequisites are met and player has sufficient skill points
+    //
     public void UnlockSkill(string groupName, int skillIndex)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -50,12 +59,15 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
             return;
         }
 
-        playerStats.SkillPoints -= skill.cost; // <-- теперь через playerStats
+        playerStats.SkillPoints -= skill.cost;
         skill.isUnlocked = true;
         OnSkillPointsChanged?.Invoke(playerStats.SkillPoints);
         OnSkillsUpdated?.Invoke();
     }
 
+    //
+    // Purchases question state for a skill if player has sufficient gold
+    //
     public void BuyQuestionState(string groupName, int skillIndex)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -74,6 +86,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         OnSkillsUpdated?.Invoke();
     }
 
+    //
+    // Resets all resettable skills in the current panel and returns skill points
+    //
     public void ResetSkills()
     {
         string currentGroupName = SkillPanelManager?.GetCurrentPanelName() ?? "Normal";
@@ -105,6 +120,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         Debug.Log($"Сброшено навыков: {group.skills.Count(s => s.isUnlocked == false && s.canBeReset)}. Возвращено {pointsToReturn} очков.");
     }
 
+    //
+    // Resets question states and returns gold for purchased questions in current panel
+    //
     public void ResetQuestionsAndGold()
     {
         string currentGroupName = SkillPanelManager?.GetCurrentPanelName() ?? "Normal";
@@ -132,18 +150,44 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         OnSkillsUpdated?.Invoke();
     }
 
+    //
+    // Adds skill points to the player's total
+    //
     public void AddSkillPoints(int points)
     {
         playerStats.SkillPoints += points;
         OnSkillPointsChanged?.Invoke(playerStats.SkillPoints);
     }
+
+    //
+    // Returns the current skill points available to the player
+    //
     public int GetSkillPoints() => playerStats.SkillPoints;
+
+    //
+    // Returns all skills across all groups
+    //
     public Skill[] GetAllSkills() => skillGroups.SelectMany(g => g.skills).ToArray();
+
+    //
+    // Returns all skills in a specific group by name
+    //
     public Skill[] GetAllSkillsInGroup(string groupName) =>
         skillGroups.FirstOrDefault(g => g.groupName == groupName)?.skills ?? new Skill[0];
+
+    //
+    // Returns the current gold amount
+    //
     public int GetGold() => playerStats.Gold;
+
+    //
+    // Returns all skill groups
+    //
     public SkillGroup[] GetSkillGroups() => skillGroups;
 
+    //
+    // Sets the visibility of a skill and updates its UI state
+    //
     public void SetSkillVisibility(string groupName, int skillIndex, bool isVisible)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -156,6 +200,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         OnSkillsUpdated?.Invoke();
     }
 
+    //
+    // Sets skill visibility with extended functionality for hidden panel unlocking
+    //
     public void SetSkillVisibility1(string groupName, int skillIndex, bool isVisible)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -185,6 +232,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         OnSkillsUpdated?.Invoke();
     }
 
+    //
+    // Resets a single skill and its dependent skills with notification
+    //
     public void ResetSkill(string groupName, int skillIndex)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -248,6 +298,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         }
     }
 
+    //
+    // Recursively finds all skills that depend on the given skill
+    //
     private void FindDependentSkills(SkillGroup group, Skill skillToReset, List<Skill> skillsToReset, ref int totalPointsToReturn)
     {
         foreach (var skill in group.skills)
@@ -263,6 +316,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         }
     }
 
+    //
+    // Upgrades a skill to the next level if player has sufficient gold
+    //
     public void UpgradeSkill(string groupName, int skillIndex)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -293,6 +349,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         Debug.Log($"Навык {skill.skillName} улучшен до уровня {skill.currentLevel}. Потрачено {skill.upgradeCosts[skill.currentLevel - 1]} золота.");
     }
 
+    //
+    // Resets all upgrades for a skill and returns the gold spent on them
+    //
     public void ResetSkillUpgrades(string groupName, int skillIndex)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -325,6 +384,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         Debug.Log($"Улучшения для навыка {skill.skillName} сброшены. Возвращено {goldToReturn} золота.");
     }
 
+    //
+    // Downgrades a skill to a target level and returns excess upgrade gold
+    //
     public void ResetSkillToLevel(string groupName, int skillIndex, int targetLevel)
     {
         SkillGroup group = skillGroups.FirstOrDefault(g => g.groupName == groupName);
@@ -357,7 +419,9 @@ public class SkillLogicManager : MonoBehaviour, ISkillTreeManager
         Debug.Log($"Навык {skill.skillName} сброшен до уровня {targetLevel}. Возвращено {goldToReturn} золота.");
     }
 
-        // <--- ДОБАВИТЬ МЕТОД ПОИСКА НАВЫКА
+    //
+    // Finds and returns a skill by its name across all groups
+    //
     public Skill GetSkillByName(string skillName)
     {
         return GetAllSkills().FirstOrDefault(s => s.skillName == skillName);

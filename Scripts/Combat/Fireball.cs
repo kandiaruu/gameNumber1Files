@@ -1,7 +1,13 @@
+//
+// Fireball is a projectile that travels forward at a speed defined by its current skill level stats.
+// On collision it deals pre-calculated damage to enemies or their crit points, shows a damage popup,
+// triggers on-hit gameplay effects, plays a 2D hit sound, and destroys itself.
+// Player colliders and trigger volumes are ignored.
+//
+
 using UnityEngine;
 using System.Collections.Generic;
 
-// Структура для хранения статов на каждом уровне прокачки
 [System.Serializable]
 public class ActiveSkillStats
 {
@@ -13,29 +19,28 @@ public class ActiveSkillStats
 
 public class Fireball : MonoBehaviour
 {
-    [Header("Настройки по уровням (0 = 1 уровень)")]
+    [Header("Stats per level (index 0 = level 1)")]
     public ActiveSkillStats[] statsPerLevel;
 
-    [Header("Настройки полета")]
+    [Header("Flight settings")]
     public float maxDistance = 500f;
-    public AudioClip hitSound; 
+    public AudioClip hitSound;
 
-    // Ссылки, которые передаст игрок
-    [HideInInspector] public float calculatedDamage = 0f; // <--- Сюда придет ИТОГОВЫЙ урон
+    [HideInInspector] public float calculatedDamage = 0f;
     [HideInInspector] public int currentSkillLevel = 1;
     [HideInInspector] public List<string> skillTags;
     [HideInInspector] public IGameplaySkillManager gameplayManager;
 
     private Vector3 startPosition;
-    private DamagePopupSpawner damagePopupSpawner; 
-    private ActiveSkillStats myStats; // Текущие статы этого уровня
+    private DamagePopupSpawner damagePopupSpawner;
+    private ActiveSkillStats myStats;
 
+    // Records the spawn position, locates the DamagePopupSpawner in the scene, and selects the stat block for the current skill level
     private void Start()
     {
         startPosition = transform.position;
         damagePopupSpawner = FindFirstObjectByType<DamagePopupSpawner>();
 
-        // Определяем, какие статы использовать на основе уровня (с защитой от выхода за массив)
         int index = Mathf.Max(0, currentSkillLevel - 1);
         if (statsPerLevel != null && statsPerLevel.Length > 0)
         {
@@ -44,48 +49,43 @@ public class Fireball : MonoBehaviour
         }
         else
         {
-            myStats = new ActiveSkillStats(); // Если забыли настроить в инспекторе, берем дефолтные
+            myStats = new ActiveSkillStats();
         }
     }
 
+    // Moves the projectile forward each frame at the stat-defined speed and destroys it once it exceeds maxDistance
     private void Update()
     {
         if (myStats == null) return;
 
-        // Используем скорость из статов
         transform.Translate(Vector3.forward * myStats.speed * Time.deltaTime);
 
-        // Уничтожаем, если улетел слишком далеко
-        if (Vector3.Distance(startPosition, transform.position) >= maxDistance) 
+        if (Vector3.Distance(startPosition, transform.position) >= maxDistance)
             Destroy(gameObject);
     }
 
+    // Handles collisions: ignores the player and triggers, applies damage and on-hit effects to enemies or crit points, plays a hit sound, then destroys the projectile
     private void OnTriggerEnter(Collider other)
     {
-        // 1. Игнорируем коллайдеры самого игрока и триггеры (например, зоны агро врагов)
-        if (other.CompareTag("Player") || other.GetComponentInParent<ThirdPersonCharacter>() != null) 
-            return;
-            
-        if (other.isTrigger) 
+        if (other.CompareTag("Player") || other.GetComponentInParent<ThirdPersonCharacter>() != null)
             return;
 
-        // 2. Проверяем, враг ли это
-        var enemy = other.GetComponentInParent<EnemyAI>(); 
+        if (other.isTrigger)
+            return;
+
+        var enemy = other.GetComponentInParent<EnemyAI>();
         if (enemy != null)
         {
-            // Наносим итоговый урон, который рассчитал игрок
             enemy.TakeDamage(calculatedDamage);
 
             if (damagePopupSpawner != null)
                 damagePopupSpawner.ShowDamage(enemy.transform, calculatedDamage, false, DamageType.Magical);
 
-            // Вызываем пассивки (поджог и тд) через менеджер
             if (gameplayManager != null && skillTags != null)
                 gameplayManager.ApplyOnHitEffects(enemy, skillTags);
         }
         else
         {
-            // Проверка на попадание по критической точке врага
             var critPoint = other.GetComponent<CritPointMarker>();
             if (critPoint != null && critPoint.owner != null)
             {
@@ -100,18 +100,16 @@ public class Fireball : MonoBehaviour
             }
         }
 
-        // 3. Звук попадания (в оба наушника)
         if (hitSound != null)
         {
             GameObject audioObj = new GameObject("FireballHitSound");
             AudioSource source = audioObj.AddComponent<AudioSource>();
             source.clip = hitSound;
-            source.spatialBlend = 0f; // 2D звук
+            source.spatialBlend = 0f;
             source.Play();
             Destroy(audioObj, hitSound.length);
         }
 
-        // 4. Уничтожаем снаряд при любом столкновении со стеной, полом или врагом
         Destroy(gameObject);
     }
 }

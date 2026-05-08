@@ -1,5 +1,10 @@
 using UnityEngine;
 
+//
+// Follows the player with an orthographic top-down camera to render the minimap.
+// Supports runtime zoom adjustment via keyboard input and persists zoom level across sessions.
+//
+
 public class MinimapController : MonoBehaviour
 {
     [Header("Follow Settings")]
@@ -10,21 +15,21 @@ public class MinimapController : MonoBehaviour
     public float zoomStep = 25f;
     public float minZoom = 25f;
     public float maxZoom = 250f;
-    
-    // ВАЖНО: Ставим 150f как значение по умолчанию здесь
-    public static float SavedZoom = 150f; 
+
+    public static float SavedZoom = 150f;
 
     private Camera cam;
 
+    // Initializes the orthographic camera and applies the saved zoom level
     private void Start()
     {
         cam = GetComponent<Camera>();
         cam.orthographic = true;
 
-        // При старте СРАЗУ ставим тот зум, который мы указали в переменной
         cam.orthographicSize = SavedZoom;
     }
 
+    // Moves the camera above the player each frame and polls keyboard input for zoom adjustment
     private void LateUpdate()
     {
         if (player == null) return;
@@ -35,9 +40,9 @@ public class MinimapController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Minus)) AdjustZoom(zoomStep);
     }
 
+    // Changes the camera's orthographic size by delta, clamped between min and max zoom, and persists the new value
     private void AdjustZoom(float delta)
     {
-        // Обновляем статическую переменную, чтобы MapPanel её видела
         SavedZoom = Mathf.Clamp(cam.orthographicSize + delta, minZoom, maxZoom);
         cam.orthographicSize = SavedZoom;
     }

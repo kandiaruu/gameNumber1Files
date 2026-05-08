@@ -1,12 +1,18 @@
 using UnityEngine;
 using System.Collections.Generic;
 using TMPro;
+
+//
+// Central UI manager that owns all panel configurations, handles keyboard-driven panel toggling,
+// controls game pause state, manages cursor visibility, and arbitrates navigation/interaction permissions.
+//
+
 public class UIManager : MonoBehaviour, IUIManager
 {
+    // All panel types available in the game
     public enum PanelType
     {
         Settings,
-        Inventory,
         SkillTree,
         Notification,
         Tooltip,
@@ -14,7 +20,6 @@ public class UIManager : MonoBehaviour, IUIManager
         SkillGui,
         ItemInfo,
         Status,
-        Inventory2, // Добавлен новый тип панели
         Inventory3,
         Inventory3LootPanel,
         Inventory3LKMPanel,
@@ -27,6 +32,7 @@ public class UIManager : MonoBehaviour, IUIManager
         SkillSelect
     }
 
+    // Inspector-configured entry linking a panel type to its GameObject, optional scripts to disable, child panels, and feature flags
     [System.Serializable]
     public class PanelConfig
     {
@@ -34,16 +40,17 @@ public class UIManager : MonoBehaviour, IUIManager
         public GameObject panelObject;
         public MonoBehaviour[] scriptsToDisable;
         public List<PanelConfig> childPanels = new List<PanelConfig>();
-        public bool showTooltip = false; // По умолчанию тултип включён
-        public bool allowNavigation = false; // Новое поле для управления зумом и перетаскиванием
-        public bool allowSkillButtonInteraction = false; // Новое поле для управления кнопками
+        public bool showTooltip = false;
+        public bool allowNavigation = false;
+        public bool allowSkillButtonInteraction = false;
     }
 
+    // Maps a panel type to the scripts that should be disabled when that panel is active
     [System.Serializable]
     public class PanelScriptControl
     {
         public PanelType panelType;
-        [Tooltip("Скрипты, которые будут отключены при активации этой панели")]
+        [Tooltip("Scripts that will be disabled when this panel is activated")]
         public MonoBehaviour[] scriptsToDisable;
     }
 
@@ -54,9 +61,10 @@ public class UIManager : MonoBehaviour, IUIManager
     [SerializeField] private GameObject minimapObject;
     [SerializeField] private List<PanelConfig> panelConfigs = new List<PanelConfig>();
     [InjectAttribute1] private ISkillTreeNavigation skillTreeNavigation { get; set; }
-    [InjectAttribute1] private ISkillUIManager skillUIManager{ get; set; }
+    [InjectAttribute1] private ISkillUIManager skillUIManager { get; set; }
     [InjectAttribute1] private IInventorySearch3 inventorySearch3 { get; set; }
     [SerializeField] private List<PanelScriptControl> panelScriptControls = new List<PanelScriptControl>();
+
     private Dictionary<PanelType, GameObject> panelCache = new Dictionary<PanelType, GameObject>();
     private const int MAX_DEPTH = 5;
 
@@ -64,29 +72,32 @@ public class UIManager : MonoBehaviour, IUIManager
     private Dictionary<KeyCode, PanelType> keyMap;
     public Dictionary<PanelType, KeyCode> PanelKeys { get; private set; } = new Dictionary<PanelType, KeyCode>();
 
+    // Initializes the panel hierarchy, builds the default key map, hides the cursor, caches panels, and loads saved key bindings
     void Awake()
     {
-
         InitializePanelSystem();
 
         keyMap = new Dictionary<KeyCode, PanelType>
         {
             { KeyCode.Escape, PanelType.Settings },
-            { KeyCode.Tab, PanelType.Inventory },
+            { KeyCode.Tab, PanelType.Inventory3 },
             { KeyCode.U, PanelType.SkillTree },
             { KeyCode.BackQuote, PanelType.Status },
-            { KeyCode.M, PanelType.Map}
+            { KeyCode.M, PanelType.Map }
         };
 
         Cursor.visible = false;
         CachePanels();
         LoadPanelKeys();
     }
+
+    // Hides all panels at game start
     void Start()
     {
         HideAllPanels();
     }
 
+    // Loads panel key bindings from PlayerPrefs, falling back to defaults if not set
     public void LoadPanelKeys()
     {
         PanelKeys[PanelType.Inventory3] = (KeyCode)System.Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Key_Inventory3", KeyCode.Tab.ToString()));
@@ -96,13 +107,15 @@ public class UIManager : MonoBehaviour, IUIManager
         PanelKeys[PanelType.SkillSelect] = (KeyCode)System.Enum.Parse(typeof(KeyCode), PlayerPrefs.GetString("Key_SkillSelect", KeyCode.O.ToString()));
     }
 
+    // Persists a new key binding for the given panel type to PlayerPrefs
     public void SetPanelKey(PanelType type, KeyCode key)
     {
         PanelKeys[type] = key;
         PlayerPrefs.SetString("Key_" + type.ToString(), key.ToString());
         PlayerPrefs.Save();
     }
-    
+
+    // Shows or hides HUD elements (HP/MP text, dot, E-key icon, minimap) based on whether any panel is open
     private void UpdateDotVisibility()
     {
         bool anyPanelOpen = false;
@@ -125,6 +138,7 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    // Returns true if the panel's GameObject is currently active in the scene
     private bool IsPanelOrChildOpen(PanelConfig config)
     {
         if (config.panelObject != null && config.panelObject.activeSelf)
@@ -135,12 +149,14 @@ public class UIManager : MonoBehaviour, IUIManager
         return false;
     }
 
+    // Clears and rebuilds the panel lookup cache from the configured panel list
     private void CachePanels()
     {
         panelCache.Clear();
         CachePanelsRecursive(panelConfigs);
     }
 
+    // Recursively walks the panel config tree and stores each panel's GameObject in the cache by type
     private void CachePanelsRecursive(List<PanelConfig> configs)
     {
         foreach (var config in configs)
@@ -149,7 +165,7 @@ public class UIManager : MonoBehaviour, IUIManager
             {
                 if (panelCache.ContainsKey(config.panelType))
                 {
-                    Debug.LogWarning($"Обнаружен дубликат типа панели {config.panelType}. Используется первый найденный объект.");
+                    Debug.LogWarning($"Duplicate panel type {config.panelType} detected. Using the first found object.");
                 }
                 else
                 {
@@ -158,30 +174,32 @@ public class UIManager : MonoBehaviour, IUIManager
             }
             else
             {
-                Debug.LogError($"PanelObject для типа {config.panelType} не назначен!");
+                Debug.LogError($"PanelObject for type {config.panelType} is not assigned!");
             }
             CachePanelsRecursive(config.childPanels);
         }
     }
 
+    // Returns the cached GameObject for the given panel type, or null if not found
     public GameObject GetPanel(PanelType panelType)
     {
         if (panelCache.TryGetValue(panelType, out GameObject panel))
         {
             return panel;
         }
-        Debug.LogError($"Панель типа {panelType} не найдена в кэше!");
+        Debug.LogError($"Panel of type {panelType} not found in cache!");
         return null;
     }
 
+    // Returns the full list of panel configurations
     public List<PanelConfig> GetPanelConfigs()
     {
         return panelConfigs;
     }
 
+    // Polls keyboard input each frame: Escape is hardcoded to close or open settings; other panels use remappable keys
     void Update()
     {
-        // Кнопку Escape оставляем жестко зашитой, чтобы игрок случайно не удалил её и не застрял в меню
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             if (currentPanel != null)
@@ -202,9 +220,9 @@ public class UIManager : MonoBehaviour, IUIManager
                 }
                 else if (inventorySearch3 != null && inventorySearch3.returnSearching() == true)
                 {
-                    Debug.Log("Escape не сработал, так как активна панель инвентаря");
+                    Debug.Log("Escape did not fire because the inventory search panel is active");
                 }
-                else 
+                else
                 {
                     CloseCurrentPanel();
                 }
@@ -236,6 +254,7 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    // Closes the current panel if it matches the requested type (or if Settings is requested), otherwise opens the panel
     private void TogglePanel(PanelType panelType)
     {
         if (currentPanel != null)
@@ -251,6 +270,7 @@ public class UIManager : MonoBehaviour, IUIManager
         OpenPanel(panelType);
     }
 
+    // Hides all panels, then opens the requested panel, pauses the game, and updates component/script states
     public void OpenPanel(PanelType panelType)
     {
         HideAllPanels();
@@ -264,19 +284,20 @@ public class UIManager : MonoBehaviour, IUIManager
                 SetGamePaused(true);
                 UpdateSkillComponentsState();
                 UpdateScriptStates(panelType);
-                UpdateDotVisibility(); 
+                UpdateDotVisibility();
             }
             else
             {
-                Debug.LogError($"Панель {panelType} не имеет компонента IPanel!");
+                Debug.LogError($"Panel {panelType} does not have an IPanel component!");
             }
         }
         else
         {
-            Debug.LogError($"Конфигурация для панели {panelType} не найдена!");
+            Debug.LogError($"Configuration for panel {panelType} not found!");
         }
     }
 
+    // Closes the active panel, unpauses the game, resets skill tree navigation if needed, and clears component/script states
     public void CloseCurrentPanel()
     {
         if (currentPanel != null)
@@ -292,10 +313,11 @@ public class UIManager : MonoBehaviour, IUIManager
             SetGamePaused(false);
             UpdateSkillComponentsState();
             UpdateScriptStates(null);
-            UpdateDotVisibility(); 
+            UpdateDotVisibility();
         }
     }
 
+    // Closes every panel in the hierarchy and resets all associated state
     private void HideAllPanels()
     {
         foreach (var config in panelConfigs)
@@ -312,6 +334,7 @@ public class UIManager : MonoBehaviour, IUIManager
         UpdateDotVisibility();
     }
 
+    // Closes a panel and all of its configured child panels recursively
     private void HidePanelRecursive(PanelConfig config)
     {
         if (config.panelObject != null)
@@ -328,28 +351,31 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    // Pauses or unpauses the game and shows or locks the cursor accordingly
     private void SetGamePaused(bool paused)
     {
         Time.timeScale = paused ? 0 : 1;
 
         if (paused)
         {
-            Cursor.lockState = CursorLockMode.None; 
-            Cursor.visible = true;                  
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
         else
         {
-            Cursor.lockState = CursorLockMode.Locked; 
-            Cursor.visible = false;                   
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
     }
 
+    // Opens a panel only if no other panel is currently open
     public void ActivatePanel(PanelType panelType)
     {
         if (currentPanel != null) return;
         OpenPanel(panelType);
     }
 
+    // Enables or disables skill tree navigation and skill UI components based on whether the SkillTree panel is active
     private void UpdateSkillComponentsState()
     {
         var skillTreeConfig = FindPanelConfigByType(panelConfigs, PanelType.SkillTree);
@@ -380,6 +406,7 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    // Re-enables all controlled scripts, then disables those associated with the currently active panel type
     private void UpdateScriptStates(PanelType? activePanelType)
     {
         foreach (var control in panelScriptControls)
@@ -409,6 +436,7 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    // Bootstraps the panel hierarchy by recursively adding BasePanel components and registering child panels
     private void InitializePanelSystem()
     {
         foreach (var config in panelConfigs)
@@ -417,24 +445,25 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    // Recursively initializes a single panel config entry: guards against depth overflow and cycles, adds BasePanel, and links children
     private void InitializePanelRecursive(PanelConfig config, int currentDepth = 0, HashSet<PanelConfig> visited = null)
     {
         if (currentDepth >= MAX_DEPTH)
         {
-            Debug.LogError($"Превышена максимальная глубина иерархии ({MAX_DEPTH}) для панели {config.panelType}!");
+            Debug.LogError($"Maximum panel hierarchy depth ({MAX_DEPTH}) exceeded for panel {config.panelType}!");
             return;
         }
 
         if (config == null || config.panelObject == null)
         {
-            Debug.LogError($"Панель {config?.panelType} не назначена или некорректна!");
+            Debug.LogError($"Panel {config?.panelType} is not assigned or is invalid!");
             return;
         }
 
         visited = visited ?? new HashSet<PanelConfig>();
         if (!visited.Add(config))
         {
-            Debug.LogError($"Обнаружен цикл в конфигурации панели {config.panelType}!");
+            Debug.LogError($"Cycle detected in panel configuration for {config.panelType}!");
             return;
         }
 
@@ -458,6 +487,7 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    // Returns true if the currently active panel allows skill button interaction; true by default when no panel is open
     public bool ShouldAllowSkillButtonInteraction()
     {
         var activePanelConfig = FindActivePanelConfig();
@@ -465,17 +495,18 @@ public class UIManager : MonoBehaviour, IUIManager
         {
             if (!activePanelConfig.allowSkillButtonInteraction)
             {
-                Debug.Log($"Взаимодействие с кнопками навыков отключено для панели {activePanelConfig.panelType}");
+                Debug.Log($"Skill button interaction disabled for panel {activePanelConfig.panelType}");
                 return false;
             }
         }
         else
         {
-            Debug.Log("Активная панель не найдена, разрешаем взаимодействие с кнопками по умолчанию");
+            Debug.Log("No active panel found, allowing skill button interaction by default");
         }
         return true;
     }
 
+    // Searches the config tree for the entry whose panelObject matches the given GameObject
     private PanelConfig FindPanelConfig(List<PanelConfig> configs, GameObject panelObject)
     {
         foreach (var config in configs)
@@ -493,6 +524,7 @@ public class UIManager : MonoBehaviour, IUIManager
         return null;
     }
 
+    // Searches the config tree for the entry with the given PanelType
     private PanelConfig FindPanelConfigByType(List<PanelConfig> configs, PanelType panelType)
     {
         foreach (var config in configs)
@@ -510,6 +542,7 @@ public class UIManager : MonoBehaviour, IUIManager
         return null;
     }
 
+    // Returns the first open child panel found under the given config, searching depth-first
     private IPanel FindActiveChild(PanelConfig config)
     {
         foreach (var childConfig in config.childPanels)
@@ -528,26 +561,30 @@ public class UIManager : MonoBehaviour, IUIManager
         return null;
     }
 
+    // Returns the deepest active panel configuration in the hierarchy
     public PanelConfig FindActivePanelConfig()
     {
         PanelConfig deepestActiveConfig = null;
         FindActivePanelConfigRecursive(panelConfigs, ref deepestActiveConfig, 0);
         return deepestActiveConfig;
     }
-    public bool ShouldAllowNavigation()
-        {
-            var activePanelConfig = FindActivePanelConfig();
-            if (activePanelConfig != null)
-            {
-                if (!activePanelConfig.allowNavigation)
-                {
-                    Debug.Log($"Навигация отключена для панели {activePanelConfig.panelType}");
-                    return false;
-                }
-            }
-            return true;
-        }
 
+    // Returns true if the currently active panel allows skill tree navigation; true when no panel is open
+    public bool ShouldAllowNavigation()
+    {
+        var activePanelConfig = FindActivePanelConfig();
+        if (activePanelConfig != null)
+        {
+            if (!activePanelConfig.allowNavigation)
+            {
+                Debug.Log($"Navigation disabled for panel {activePanelConfig.panelType}");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Recursively walks all configs and tracks the deepest active one
     private void FindActivePanelConfigRecursive(List<PanelConfig> configs, ref PanelConfig deepestActiveConfig, int currentDepth)
     {
         foreach (var config in configs)
@@ -563,11 +600,13 @@ public class UIManager : MonoBehaviour, IUIManager
         }
     }
 
+    // Returns the nesting depth of the target config within the config tree
     private int GetDepth(List<PanelConfig> configs, PanelConfig targetConfig)
     {
         return GetDepthRecursive(configs, targetConfig, 0);
     }
 
+    // Recursively searches for targetConfig and returns its depth, or -1 if not found
     private int GetDepthRecursive(List<PanelConfig> configs, PanelConfig targetConfig, int currentDepth)
     {
         foreach (var config in configs)
@@ -585,6 +624,7 @@ public class UIManager : MonoBehaviour, IUIManager
         return -1;
     }
 
+    // Closes all immediate child panels of the given parent panel type
     public void CloseAllChildren(PanelType parentPanelType)
     {
         var parentConfig = FindPanelConfigByType(panelConfigs, parentPanelType);
@@ -601,8 +641,7 @@ public class UIManager : MonoBehaviour, IUIManager
                     }
                     else
                     {
-                        // На случай, если на панели нет IPanel
-                        childConfig.panelObject.SetActive(false); 
+                        childConfig.panelObject.SetActive(false);
                     }
                 }
             }

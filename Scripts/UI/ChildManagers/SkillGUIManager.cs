@@ -1,5 +1,10 @@
 using UnityEngine;
 
+//
+// Manages the Skill GUI panel: resolves it via UIManager and exposes
+// open, close, and update operations for displaying per-skill detail views.
+//
+
 public class SkillGuiManager : MonoBehaviour, ISkillGuiManager
 {
     [InjectAttribute1]
@@ -9,12 +14,14 @@ public class SkillGuiManager : MonoBehaviour, ISkillGuiManager
     [InjectAttribute1]
     private IUIManager uiManager { get; set; }
 
+    // Injects dependencies and initializes the SkillGui panel reference
     void Start()
     {
         DependencyContainer1.InjectDependencies(this);
         InitializeSkillGuiPanel();
     }
 
+    // Retrieves the SkillGui panel from UIManager and caches the ISkillGuiPanel component
     private void InitializeSkillGuiPanel()
     {
         GameObject skillGuiPanelObject = uiManager.GetPanel(UIManager.PanelType.SkillGui);
@@ -23,15 +30,16 @@ public class SkillGuiManager : MonoBehaviour, ISkillGuiManager
             skillGuiPanel = skillGuiPanelObject.GetComponent<SkillGuiPanel>();
             if (skillGuiPanel == null)
             {
-                Debug.LogError($"Панель {skillGuiPanelObject.name} (SkillGui) не реализует ISkillGuiPanel!");
+                Debug.LogError($"Panel {skillGuiPanelObject.name} (SkillGui) does not implement ISkillGuiPanel!");
             }
         }
         else
         {
-            Debug.LogError("Панель типа SkillGui не найдена в кэше UIManager!");
+            Debug.LogError("Panel of type SkillGui not found in UIManager cache!");
         }
     }
 
+    // Opens the Skill GUI and displays information for the given skill
     public void ShowSkillGui(Skill skill)
     {
         if (skillGuiPanel != null)
@@ -40,15 +48,17 @@ public class SkillGuiManager : MonoBehaviour, ISkillGuiManager
         }
         else
         {
-            Debug.LogWarning("SkillGuiPanel не инициализирован!");
+            Debug.LogWarning("SkillGuiPanel is not initialized!");
         }
     }
 
+    // Returns true if the Skill GUI panel is currently open
     public bool IsSkillGuiActive()
     {
         return skillGuiPanel != null && skillGuiPanel.IsOpen;
     }
 
+    // Closes the Skill GUI panel if it is currently open
     public void CloseSkillGui()
     {
         if (skillGuiPanel != null && skillGuiPanel.IsOpen)
@@ -56,6 +66,8 @@ public class SkillGuiManager : MonoBehaviour, ISkillGuiManager
             skillGuiPanel.Close();
         }
     }
+
+    // Refreshes the Skill GUI panel's displayed data if it is open
     public void UpdateUI()
     {
         if (skillGuiPanel != null && skillGuiPanel.IsOpen)

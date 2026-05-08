@@ -138,16 +138,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   statsPerLevel:
   - damage: 100
-    manaCost: 10
+    manaCost: 25
     cooldown: 3
     speed: 50
   - damage: 200
-    manaCost: 10
+    manaCost: 30
     cooldown: 2
     speed: 50
   maxDistance: 100
   hitSound: {fileID: 8300000, guid: 8ae6850f73d62984ead808ed05b135f2, type: 3}
-  finalDamageMultiplier: 1
+  calculatedDamage: 0
   currentSkillLevel: 1
   skillTags: []
 --- !u!54 &7103595260417601450

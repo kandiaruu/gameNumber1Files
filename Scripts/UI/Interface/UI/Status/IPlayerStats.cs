@@ -30,4 +30,6 @@ public interface IPlayerStats
     void TakeDamage(float damage, string damageType);
     float CalculateDamage(bool isCritical);
     void ResetAttributes();
+    void AddExperience(int amount);
+    bool ConsumeMana(float amount);
 }

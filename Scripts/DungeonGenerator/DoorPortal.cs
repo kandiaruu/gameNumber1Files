@@ -1,3 +1,10 @@
+//
+// DoorPortal defines a two-sided door connection between dungeon rooms.
+// It stores the two colliders the player can press, the matching teleport
+// spawn points, directional data used by the dungeon generator for snapping,
+// and a socket point for placement alignment.
+//
+
 using UnityEngine;
 
 public enum DoorSideType
@@ -27,6 +34,7 @@ public class DoorPortal : MonoBehaviour
     [Header("Door socket point")]
     public Transform socket;
 
+    // Returns the horizontal forward direction of this door, used by the dungeon generator to align new rooms
     public Vector3 SideDir
     {
         get
@@ -37,5 +45,6 @@ public class DoorPortal : MonoBehaviour
         }
     }
 
+    // Returns the world position of the socket point, used as the snap anchor during room placement
     public Vector3 SocketPos => socket ? socket.position : transform.position;
 }

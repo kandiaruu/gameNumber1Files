@@ -2,8 +2,8 @@ public interface ISkillTreeManager
 {
     void UnlockSkill(string groupName, int skillIndex);
     void BuyQuestionState(string groupName, int skillIndex);
-    void ResetSkills(); // Старая версия
-    void ResetQuestionsAndGold(); // Старая версия
+    void ResetSkills();
+    void ResetQuestionsAndGold();
     void AddSkillPoints(int points);
     int GetSkillPoints();
     Skill[] GetAllSkills();

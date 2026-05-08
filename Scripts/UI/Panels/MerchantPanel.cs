@@ -1,3 +1,9 @@
+//
+// Panel for a simple merchant that sells lockpicks. The player enters a quantity,
+// sees the total cost, and confirms the purchase which deducts gold and adds
+// items to the inventory.
+//
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -9,16 +15,17 @@ public class MerchantPanel : BasePanel, IMerchantPanel
     [InjectAttribute1] private IPlayerStats playerStats { get; set; }
     [InjectAttribute1] private IInventoryPanel3 inventoryPanel { get; set; }
 
-    [Header("Торговля")]
-    [SerializeField] private Button buyButton;            
-    [SerializeField] private TMP_InputField amountInput;    
-    [SerializeField] private TextMeshProUGUI amountText;  
-    [SerializeField] private TextMeshProUGUI buyButtonText;     
+    [Header("Trade")]
+    [SerializeField] private Button buyButton;
+    [SerializeField] private TMP_InputField amountInput;
+    [SerializeField] private TextMeshProUGUI amountText;
+    [SerializeField] private TextMeshProUGUI buyButtonText;
 
     private int lockpickItemId = 4;
     private int lockpickPrice = 20;
     private int currentAmount = 1;
 
+    // Injects dependencies, configures the amount input field, wires the buy button, and refreshes the UI
     public override void Awake()
     {
         base.Awake();
@@ -27,7 +34,7 @@ public class MerchantPanel : BasePanel, IMerchantPanel
         if (amountInput != null)
         {
             amountInput.contentType = TMP_InputField.ContentType.IntegerNumber;
-            amountInput.characterLimit = 3; 
+            amountInput.characterLimit = 3;
             amountInput.onValueChanged.AddListener(OnInputChanged);
             amountInput.onEndEdit.AddListener(OnInputEndEdit);
         }
@@ -40,14 +47,15 @@ public class MerchantPanel : BasePanel, IMerchantPanel
         UpdateUI();
     }
 
+    // Parses and clamps the typed value (1-100) and refreshes the cost display
     private void OnInputChanged(string text)
     {
-        if (string.IsNullOrEmpty(text)) return; 
+        if (string.IsNullOrEmpty(text)) return;
 
         if (int.TryParse(text, out int val))
         {
-            currentAmount = Mathf.Clamp(val, 1, 100); 
-            if (val > 100 && amountInput != null) 
+            currentAmount = Mathf.Clamp(val, 1, 100);
+            if (val > 100 && amountInput != null)
             {
                 amountInput.SetTextWithoutNotify(currentAmount.ToString());
             }
@@ -55,6 +63,7 @@ public class MerchantPanel : BasePanel, IMerchantPanel
         }
     }
 
+    // Resets the amount to 1 if the field is left empty or contains an invalid value on submit
     private void OnInputEndEdit(string text)
     {
         if (string.IsNullOrEmpty(text) || !int.TryParse(text, out int val) || val < 1)
@@ -65,10 +74,11 @@ public class MerchantPanel : BasePanel, IMerchantPanel
         }
     }
 
+    // Refreshes the buy button label with the current total cost and the amount display text
     private void UpdateUI()
     {
         int totalCost = currentAmount * lockpickPrice;
-        
+
         if (buyButtonText != null)
         {
             buyButtonText.text = $"Buy for {totalCost} gold";
@@ -80,6 +90,7 @@ public class MerchantPanel : BasePanel, IMerchantPanel
         }
     }
 
+    // Deducts gold and adds lockpicks to the player inventory if the player can afford the purchase
     private void OnBuyClicked()
     {
         if (playerStats == null || inventoryPanel == null) return;
@@ -93,25 +104,26 @@ public class MerchantPanel : BasePanel, IMerchantPanel
 
             if (success)
             {
-                Debug.Log($"Успешно куплено {currentAmount} шт. за {totalCost} золота!");
+                Debug.Log($"Successfully bought {currentAmount} item(s) for {totalCost} gold!");
             }
         }
         else
         {
-            Debug.LogWarning("Не хватает золота!");
+            Debug.LogWarning("Not enough gold!");
         }
     }
 
+    // Resets the amount to 1, clears the input field, and closes the panel
     public override void Close()
     {
         currentAmount = 1;
-        
-        if (amountInput != null) 
+
+        if (amountInput != null)
         {
             amountInput.SetTextWithoutNotify("1");
         }
-        
+
         UpdateUI();
         base.Close();
-    } 
+    }
 }

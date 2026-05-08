@@ -1,3 +1,7 @@
+//
+// Manages equipped skills and keybinding assignments for active and passive skills
+//
+
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -10,7 +14,7 @@ public interface ISkillEquipManager
     void EquipSkill(Skill skill, int slotIndex, SkillCategory category);
     void UnequipSkill(int slotIndex, SkillCategory category);
     bool IsSkillEquipped(Skill skill);
-    void SetKey(int slotIndex, KeyCode newKey); // <--- ДОБАВЛЕНО
+    void SetKey(int slotIndex, KeyCode newKey);
 }
 
 public class SkillEquipManager : MonoBehaviour, ISkillEquipManager
@@ -22,25 +26,36 @@ public class SkillEquipManager : MonoBehaviour, ISkillEquipManager
 
     public KeyCode[] ActiveSkillKeys { get; private set; } = new KeyCode[6];
 
-    // Кнопки по умолчанию, если игрок зашел в первый раз
     private KeyCode[] defaultKeys = { KeyCode.F, KeyCode.Z, KeyCode.X, KeyCode.C, KeyCode.Q, KeyCode.E };
 
+    //
+    // Initializes dependencies and loads saved keybindings
+    //
     private void Awake()
     {
         DependencyContainer1.InjectDependencies(this);
-        LoadKeys(); // Загружаем сохраненные кнопки при старте
+        LoadKeys();
     }
 
+    //
+    // Subscribes to skill update events
+    //
     private void Start()
     {
         if (skillTreeManager != null) skillTreeManager.OnSkillsUpdated += ValidateEquippedSkills;
     }
 
+    //
+    // Unsubscribes from skill update events on destruction
+    //
     private void OnDestroy()
     {
         if (skillTreeManager != null) skillTreeManager.OnSkillsUpdated -= ValidateEquippedSkills;
     }
 
+    //
+    // Removes equipped skills that are no longer unlocked
+    //
     private void ValidateEquippedSkills()
     {
         for (int i = 0; i < 6; i++)
@@ -50,7 +65,9 @@ public class SkillEquipManager : MonoBehaviour, ISkillEquipManager
         }
     }
 
-    // <--- СОХРАНЕНИЕ И ЗАГРУЗКА КНОПОК --->
+    //
+    // Loads keybindings from player preferences or uses defaults
+    //
     private void LoadKeys()
     {
         for (int i = 0; i < 6; i++)
@@ -67,6 +84,9 @@ public class SkillEquipManager : MonoBehaviour, ISkillEquipManager
         }
     }
 
+    //
+    // Sets a new keybinding for a skill slot and saves it
+    //
     public void SetKey(int slotIndex, KeyCode newKey)
     {
         ActiveSkillKeys[slotIndex] = newKey;
@@ -74,6 +94,9 @@ public class SkillEquipManager : MonoBehaviour, ISkillEquipManager
         PlayerPrefs.Save();
     }
 
+    //
+    // Equips a skill to a specific slot, unequipping it from other slots if necessary
+    //
     public void EquipSkill(Skill skill, int slotIndex, SkillCategory category)
     {
         if (skill == null) return;
@@ -86,12 +109,18 @@ public class SkillEquipManager : MonoBehaviour, ISkillEquipManager
         else if (category == SkillCategory.Passive) EquippedPassives[slotIndex] = skill;
     }
 
+    //
+    // Unequips a skill from a specific slot
+    //
     public void UnequipSkill(int slotIndex, SkillCategory category)
     {
         if (category == SkillCategory.Active) EquippedActives[slotIndex] = null;
         else if (category == SkillCategory.Passive) EquippedPassives[slotIndex] = null;
     }
 
+    //
+    // Checks if a skill is equipped in any slot
+    //
     public bool IsSkillEquipped(Skill skill)
     {
         foreach (var s in EquippedActives) if (s == skill) return true;

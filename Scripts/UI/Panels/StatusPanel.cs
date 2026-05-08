@@ -1,3 +1,8 @@
+//
+// Displays and manages the player status panel, including level, experience,
+// gold, skill/attribute points, HP/MP/fatigue, and per-attribute upgrade buttons.
+//
+
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -33,6 +38,7 @@ public class StatusPanel : BasePanel
 
     List<AttributeButton> attributeButtons = new();
 
+    // Injects dependencies, wires up the reset button, and performs the initial UI refresh
     void Start()
     {
         DependencyContainer1.InjectDependencies(this);
@@ -40,12 +46,14 @@ public class StatusPanel : BasePanel
         RefreshUI();
     }
 
+    // Resets all attribute points via PlayerStats and refreshes the UI
     void OnResetButtonPressed()
     {
         PlayerStats.ResetAttributes();
         RefreshUI();
     }
 
+    // Destroys existing attribute buttons and spawns a fresh set from the display-name dictionary
     void CreateAttributeButtons()
     {
         foreach (Transform child in attributesButtonsParent)
@@ -60,6 +68,7 @@ public class StatusPanel : BasePanel
         }
     }
 
+    // Returns the current numeric value of the given attribute key from PlayerStats
     int GetStatValue(string attrKey)
     {
         return attrKey switch
@@ -75,6 +84,7 @@ public class StatusPanel : BasePanel
         };
     }
 
+    // Updates all stat labels and re-initialises every attribute button with current values
     public void RefreshUI()
     {
         if (PlayerStats == null) return;
@@ -100,6 +110,7 @@ public class StatusPanel : BasePanel
         }
     }
 
+    // Spends one attribute point to increase the specified attribute by 1, then refreshes the UI
     void OnAttributeIncreasePressed(string attrKey)
     {
         if (PlayerStats.AttributePoints <= 0)
@@ -119,6 +130,7 @@ public class StatusPanel : BasePanel
         RefreshUI();
     }
 
+    // Opens the panel and immediately refreshes all displayed stats
     public override void Open()
     {
         base.Open();

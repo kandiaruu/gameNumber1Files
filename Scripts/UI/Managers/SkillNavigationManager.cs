@@ -2,6 +2,11 @@ using UnityEngine;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 
+//
+// Handles mouse-driven panning and scroll-wheel zooming of the skill tree canvas.
+// Also provides programmatic centering on a specific skill and navigation reset.
+//
+
 public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 {
     [SerializeField] private RectTransform skillHolder;
@@ -26,11 +31,13 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
 
     public Skill LastSkill;
 
+    // Caches the skill holder's original pivot before any zoom manipulation
     private void Awake()
     {
         originalPivot = skillHolder.pivot;
     }
 
+    // Processes zoom and drag input each frame, applying movement only when the cursor is over the container and navigation is allowed
     private void Update()
     {
         if (skillHolder == null || skillTreeContainer == null)
@@ -72,60 +79,59 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
             Vector3 delta = Input.mousePosition - dragOrigin;
             dragOrigin = Input.mousePosition;
 
-            // Читаем DPI (чувствительность) из настроек
             float dpiMultiplier = PlayerPrefs.GetFloat("SkillTreeDragDPI", 1f);
 
-            // Умножаем дельту мышки на DPI
             Vector2 moveDelta = new Vector2(delta.x * dpiMultiplier, delta.y * dpiMultiplier);
-            
+
             Vector2 newPosition = skillHolder.anchoredPosition + moveDelta;
             skillHolder.anchoredPosition = ClampPosition(newPosition);
         }
     }
+
+    // Moves the skill holder so the given skill's button is centered within the container
     public void CenterOnSkill(Skill skill)
     {
         LastSkill = skill;
         if (skill == null || skill.skillButton == null)
         {
-            Debug.LogWarning("Навык или его кнопка не назначены!");
+            Debug.LogWarning("Skill or its button is not assigned!");
             return;
         }
 
         RectTransform skillRect = skill.skillButton.GetComponent<RectTransform>();
         if (skillRect == null)
         {
-            Debug.LogWarning("RectTransform кнопки навыка не найден!");
+            Debug.LogWarning("RectTransform of the skill button not found!");
             return;
         }
 
-        // Получаем позицию навыка в мировых координатах
         Vector3 worldPos = skillRect.position;
 
-        // Переводим её в локальные координаты относительно skillHolder
         Vector3 localInHolder3D = skillHolder.InverseTransformPoint(worldPos);
         Vector2 localInHolder = new Vector2(localInHolder3D.x, localInHolder3D.y);
 
-        // Центр контейнера — учитываем, что anchor у skillHolder (0,1) — top-left
         Vector2 containerCenter = new Vector2(
             skillTreeContainer.rect.width / 2f,
-            -skillTreeContainer.rect.height / 2f // Y вниз
+            -skillTreeContainer.rect.height / 2f
         );
 
-        // Вычисляем новое положение skillHolder
         Vector2 offset = containerCenter - localInHolder * skillHolder.localScale.x;
         skillHolder.anchoredPosition = ClampPosition(offset);
     }
 
+    // Returns the last skill that was centered on
     public Skill getLastSkill()
     {
         return LastSkill;
     }
 
+    // Records the given skill as the last-navigated skill without moving the camera
     public void inputLastSkill(Skill skill)
     {
         LastSkill = skill;
     }
 
+    // Scales the skill holder around the mouse cursor position, keeping the hovered point stationary
     private void HandleZoom(float scrollDelta)
     {
         float currentScale = skillHolder.localScale.x;
@@ -149,6 +155,7 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
         skillHolder.anchoredPosition = ClampPosition(newPosition);
     }
 
+    // Clamps a candidate position so the skill holder never moves fully out of the container bounds
     private Vector2 ClampPosition(Vector2 position)
     {
         Vector2 holderSize = skillHolder.rect.size * skillHolder.localScale.x;
@@ -165,12 +172,14 @@ public class SkillTreeNavigation : MonoBehaviour, ISkillTreeNavigation
         return position;
     }
 
+    // Resets the skill holder to its default position and zoom level
     public void ResetNavigation()
     {
         skillHolder.anchoredPosition = new Vector2(960f, -455f);
         skillHolder.localScale = new Vector3(0.8f, 0.8f, 1f);
     }
 
+    // Stops any active drag when the component is disabled
     private void OnDisable()
     {
         isDragging = false;

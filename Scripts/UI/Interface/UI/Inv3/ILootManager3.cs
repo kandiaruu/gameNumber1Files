@@ -2,9 +2,9 @@ using System.Collections.Generic;
 public interface ILootManager3
 {
     int PendingGoblinKills();
-    int PendingChestOpens(); // <--- ДОБАВЛЕНО
+    int PendingChestOpens();
     void AddGoblinKill();
-    void AddChestOpen(); // <--- ДОБАВЛЕНО
+    void AddChestOpen();
     List<InvItemDatabase3> GetPendingLoot();
     List<InvItemDatabase3> ConsumePendingLoot();
 }

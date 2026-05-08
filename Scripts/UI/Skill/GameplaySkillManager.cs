@@ -1,3 +1,7 @@
+//
+// Manages gameplay mechanics for skills including damage calculations and effect application
+//
+
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,13 +19,18 @@ public class GameplaySkillManager : MonoBehaviour, IGameplaySkillManager
     [InjectAttribute1] private ISkillTreeManager skillTreeManager { get; set; }
     private DamagePopupSpawner damagePopupSpawner;
 
+    //
+    // Initializes dependencies and finds the damage popup spawner
+    //
     private void Awake()
     {
         DependencyContainer1.InjectDependencies(this);
         damagePopupSpawner = FindFirstObjectByType<DamagePopupSpawner>();
     }
 
-    // 1. Считаем итоговый урон по формуле
+    //
+    // Calculates final damage by applying passive skill bonuses using formula: (Base + Flat) * (1 + Percent) * (1 + MaxPercent)
+    //
     public float CalculateFinalDamage(float baseDamage, List<string> attackTags)
     {
         float flatBonus = 0f;
@@ -30,12 +39,10 @@ public class GameplaySkillManager : MonoBehaviour, IGameplaySkillManager
 
         if (skillTreeManager == null || attackTags == null || attackTags.Count == 0) return baseDamage;
 
-        // Берем все пассивки
         var passives = GetUnlockedSkillsByCategory(SkillCategory.Passive);
 
         foreach (var passive in passives)
         {
-            // Если теги совпадают (например, атака Fire и пассивка Fire)
             if (passive.tags != null && passive.tags.Intersect(attackTags).Any())
             {
                 int levelIndex = Mathf.Max(0, passive.currentLevel - 1);
@@ -49,7 +56,6 @@ public class GameplaySkillManager : MonoBehaviour, IGameplaySkillManager
             }
         }
 
-        // ФОРМУЛА: (Базовый + Плоский) * (1 + Процентный) * (1 + Макс.Процентный)
         float damageWithFlat = baseDamage + flatBonus;
         float damageWithPercent = damageWithFlat * (1f + percentBonus);
         float finalDamage = damageWithPercent * (1f + maxPercentBonus);
@@ -57,7 +63,9 @@ public class GameplaySkillManager : MonoBehaviour, IGameplaySkillManager
         return finalDamage;
     }
 
-    // 2. Накладываем эффекты
+    //
+    // Applies on-hit effects from passive skills to the target, such as burn damage over time
+    //
     public void ApplyOnHitEffects(EnemyAI target, List<string> attackTags)
     {
         if (target == null || !target.IsAlive || skillTreeManager == null || attackTags == null) return;
@@ -72,7 +80,6 @@ public class GameplaySkillManager : MonoBehaviour, IGameplaySkillManager
 
             SkillLevelData stats = passive.levelStats[levelIndex];
 
-            // Если есть длительность эффекта, значит это ДоТ (урон со временем)
             if (stats.effectDuration > 0 && passive.tags.Contains("Fire") && attackTags.Contains("Fire"))
             {
                 StartCoroutine(BurnRoutine(target, stats.effectDamage, stats.effectDuration));
@@ -80,6 +87,9 @@ public class GameplaySkillManager : MonoBehaviour, IGameplaySkillManager
         }
     }
 
+    //
+    // Applies continuous burn damage to a target over a duration
+    //
     private IEnumerator BurnRoutine(EnemyAI target, float damageTick, float duration)
     {
         float elapsed = 0f;
@@ -92,13 +102,16 @@ public class GameplaySkillManager : MonoBehaviour, IGameplaySkillManager
                 if (damagePopupSpawner != null)
                 {
                     Color orangeColor = new Color(1f, 0.5f, 0f);
-                    damagePopupSpawner.ShowMessage(target.transform, damageTick.ToString(), orangeColor);
+                    // damagePopupSpawner.ShowMessage(target.transform, damageTick.ToString(), orangeColor);
                 }
             }
             elapsed += 1f;
         }
     }
 
+    //
+    // Returns all unlocked skills of a specific category
+    //
     public List<Skill> GetUnlockedSkillsByCategory(SkillCategory category)
     {
         if (skillTreeManager == null) return new List<Skill>();

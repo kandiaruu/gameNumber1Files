@@ -1,3 +1,9 @@
+//
+// UI panel that lets the player switch between available skill sub-panels.
+// Dynamically creates a button for each selectable panel and keeps the header
+// button text in sync with the currently active panel name.
+//
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -13,7 +19,8 @@ public class SkillPanelUI : BasePanel, ISkillPanelUI
 
     private GameObject panelSelection;
 
-    // Метод инициализации, вызываемый менеджером
+    // Stores the manager reference, injects dependencies, retrieves the selection panel,
+    // wires up the skills button, and builds the panel-switch buttons
     public void Initialize(ISkillPanelManager manager)
     {
         skillPanelManager = manager;
@@ -29,6 +36,7 @@ public class SkillPanelUI : BasePanel, ISkillPanelUI
         CreatePanelButtons();
     }
 
+    // Wires the skills header button to the toggle method
     private void SetupSkillsButton()
     {
         if (skillsButton != null)
@@ -42,6 +50,7 @@ public class SkillPanelUI : BasePanel, ISkillPanelUI
         }
     }
 
+    // Toggles the visibility of the panel selection overlay and updates the header button label
     public void TogglePanelSelection()
     {
         if (panelSelection != null)
@@ -51,56 +60,57 @@ public class SkillPanelUI : BasePanel, ISkillPanelUI
         }
     }
 
-public void CreatePanelButtons()
-{
-    if (buttonContainer == null || buttonPrefab == null)
+    // Instantiates a button for every selectable panel; highlights the currently active one
+    public void CreatePanelButtons()
     {
-        Debug.LogError("Button container or prefab not assigned!");
-        return;
-    }
-
-    string currentPanelName = skillPanelManager.GetCurrentPanelName(); // Получаем имя текущей панели
-
-    foreach (var panel in skillPanelManager.GetPanels())
-    {
-        if (panel.isSelectable) // Создаем кнопку только если панель доступна для выбора
+        if (buttonContainer == null || buttonPrefab == null)
         {
-            Button button = Instantiate(buttonPrefab, buttonContainer);
-            button.GetComponentInChildren<TextMeshProUGUI>().text = panel.panelName;
+            Debug.LogError("Button container or prefab not assigned!");
+            return;
+        }
 
-            // Проверяем, является ли эта кнопка текущей активной панелью
-            if (panel.panelName == currentPanelName)
+        string currentPanelName = skillPanelManager.GetCurrentPanelName();
+
+        foreach (var panel in skillPanelManager.GetPanels())
+        {
+            if (panel.isSelectable)
             {
-                // Устанавливаем цвет кнопки в #005EA6
-                var buttonImage = button.GetComponent<Image>();
-                if (buttonImage != null)
+                Button button = Instantiate(buttonPrefab, buttonContainer);
+                button.GetComponentInChildren<TextMeshProUGUI>().text = panel.panelName;
+
+                if (panel.panelName == currentPanelName)
                 {
-                    buttonImage.color = new Color32(255,255,255, 255); // Цвет текста кнопки
+                    var buttonImage = button.GetComponent<Image>();
+                    if (buttonImage != null)
+                    {
+                        buttonImage.color = new Color32(255, 255, 255, 255);
+                    }
                 }
+
+                button.onClick.AddListener(() =>
+                {
+                    skillPanelManager.SwitchToPanel(panel);
+                    if (panelSelection != null)
+                    {
+                        Close();
+                    }
+                });
             }
-
-            button.onClick.AddListener(() => 
-            {
-                skillPanelManager.SwitchToPanel(panel);
-                if (panelSelection != null)
-                {
-                    Close();
-                }
-            });
         }
     }
-}
 
+    // Sets the header button label to either "Selection" (when overlay is open) or the active panel name
     public void UpdateSkillsButtonText()
     {
         if (skillsButtonText != null)
         {
-            skillsButtonText.text = panelSelection != null && panelSelection.activeSelf 
-                ? "Selection" 
+            skillsButtonText.text = panelSelection != null && panelSelection.activeSelf
+                ? "Selection"
                 : skillPanelManager.GetCurrentPanelName();
         }
     }
 
+    // Marks a panel as selectable, then rebuilds all panel-switch buttons
     public void UnlockPanel(string panelName)
     {
         var panelList = skillPanelManager.GetPanels();
@@ -108,13 +118,12 @@ public void CreatePanelButtons()
         if (panel != null)
         {
             panel.isSelectable = true;
-            // Обновляем кнопки в UI
-            ClearPanelButtons(); // Метод для очистки старых кнопок
-            CreatePanelButtons(); // Пересоздаем кнопки с учетом нового состояния
+            ClearPanelButtons();
+            CreatePanelButtons();
         }
     }
 
-    // Пример метода очистки кнопок
+    // Destroys all dynamically created panel-switch buttons
     public void ClearPanelButtons()
     {
         foreach (Transform child in buttonContainer)
@@ -123,6 +132,7 @@ public void CreatePanelButtons()
         }
     }
 
+    // Closes the panel and syncs the header button text
     public override void Close()
     {
         base.Close();

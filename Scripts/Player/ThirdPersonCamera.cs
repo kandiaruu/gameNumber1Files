@@ -1,13 +1,20 @@
+//
+// ThirdPersonCamera implements a first-person-view camera that follows a target transform.
+// It reads mouse input each frame, applies a user-configurable sensitivity multiplier
+// stored in PlayerPrefs, clamps vertical pitch, and positions/rotates the camera
+// to a head-level offset on the target.
+//
+
 using UnityEngine;
 
 public class ThirdPersonCamera : MonoBehaviour
 {
     [SerializeField] private Transform target;
-    [SerializeField] private Vector3 fpvOffset = new Vector3(0f, 1.7f, 0.1f); // Head position
-    
-    [Tooltip("Базовая чувствительность мыши")]
+    [SerializeField] private Vector3 fpvOffset = new Vector3(0f, 1.7f, 0.1f);
+
+    [Tooltip("Base mouse sensitivity")]
     [SerializeField] private float mouseSensitivity = 1.2f;
-    
+
     [SerializeField] private float pitchMin = -60f;
     [SerializeField] private float pitchMax = 80f;
     public bool isSettingsOpen = false;
@@ -15,6 +22,7 @@ public class ThirdPersonCamera : MonoBehaviour
     public float yaw = 0f;
     public float pitch = 0f;
 
+    // Validates that a target is assigned and initialises yaw/pitch from the current transform rotation
     private void Awake()
     {
         if (!target)
@@ -26,6 +34,7 @@ public class ThirdPersonCamera : MonoBehaviour
         pitch = angles.x;
     }
 
+    // Runs after all Updates each frame; skips processing if no target is assigned
     private void LateUpdate()
     {
         if (!target) return;
@@ -34,6 +43,7 @@ public class ThirdPersonCamera : MonoBehaviour
         UpdateCamera();
     }
 
+    // Reads raw mouse axes, combines base sensitivity with the PlayerPrefs multiplier, and updates yaw/pitch
     private void HandleInput()
     {
         if (isSettingsOpen) return;
@@ -41,26 +51,23 @@ public class ThirdPersonCamera : MonoBehaviour
         float mouseX = Input.GetAxisRaw("Mouse X");
         float mouseY = Input.GetAxisRaw("Mouse Y");
 
-        // <--- ДОБАВЛЕНО: Читаем множитель из настроек меню --->
         float sensitivityMultiplier = PlayerPrefs.GetFloat("MouseSensitivity", 1f);
         float finalSensitivity = mouseSensitivity * sensitivityMultiplier;
 
-        // Применяем итоговую чувствительность
         yaw += mouseX * finalSensitivity;
         pitch = Mathf.Clamp(pitch - mouseY * finalSensitivity, pitchMin, pitchMax);
     }
 
+    // Positions the camera at the head offset on the target and applies the current yaw/pitch rotation
     private void UpdateCamera()
     {
-        // Set position to head (or custom offset)
         Vector3 fpvPosition = target.position + target.TransformVector(fpvOffset);
         transform.position = fpvPosition;
 
-        // Set rotation by yaw (Y) and pitch (X)
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
         transform.rotation = rotation;
     }
 
-    // For compatibility with previous code, always return true (only fpv)
+    // Always returns true; retained for compatibility with code that checks the camera mode
     public bool IsFPV() => true;
 }

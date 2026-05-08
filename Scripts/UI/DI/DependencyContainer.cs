@@ -4,6 +4,11 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
 
+//
+// Static dependency injection container. Stores interface-to-implementation registrations,
+// manages singleton instances, and performs property injection via [InjectAttribute1].
+//
+
 public class DependencyContainer1
 {
     private static readonly Dictionary<Type, (Type ImplementationType, Lifecycle Lifecycle)> _registrations = new();
@@ -11,21 +16,25 @@ public class DependencyContainer1
     private static readonly Dictionary<Type, List<(string PropertyName, Action<object, object> Setter, Type DependencyType)>> _propertySetters = new();
     private static readonly Dictionary<Type, List<(string FieldName, Action<object, Dictionary<Type, object>> Setter, Type[] DependencyTypes)>> _dictionarySetters = new();
 
+    // Registers an interface-to-implementation mapping with the specified lifecycle
     public static void Register<TInterface, TImplementation>(Lifecycle lifecycle) where TImplementation : TInterface
     {
         _registrations[typeof(TInterface)] = (typeof(TImplementation), lifecycle);
     }
 
+    // Stores a pre-existing instance as the singleton for the given interface type
     public static void AddSingleton<TInterface>(object instance)
     {
         _singletons[typeof(TInterface)] = instance;
     }
 
+    // Creates and attaches a MonoBehaviour component of the given type to the provided GameObject
     public static TInterface CreateMonoBehaviour<TInterface>(GameObject go) where TInterface : MonoBehaviour
     {
         return go.AddComponent<TInterface>();
     }
 
+    // Resolves and injects all [InjectAttribute1]-marked properties and [InjectDictionaryAttribute1]-marked fields on the target object
     public static void InjectDependencies(object target)
     {
         Type type = target.GetType();
@@ -98,6 +107,7 @@ public class DependencyContainer1
         }
     }
 
+    // Resolves an instance for the given type, returning a cached singleton or creating a new instance
     private static object GetByType(Type type)
     {
         if (_singletons.TryGetValue(type, out var singleton))
@@ -131,19 +141,22 @@ public class DependencyContainer1
         return instance;
     }
 
+    // Removes all cached singleton instances from the container
     public static void ClearSingletons()
     {
         _singletons.Clear();
     }
 
+    // Placeholder for clearing scoped instances (not yet implemented)
     public static void ClearScoped()
     {
-        // Реализация для Scoped, если нужно
     }
 }
 
+// Marks a property for automatic dependency injection by the container
 [AttributeUsage(AttributeTargets.Property)]
 public class InjectAttribute1 : Attribute { }
 
+// Marks a Dictionary<Type, object> field to be populated with all injected dependencies
 [AttributeUsage(AttributeTargets.Field)]
 public class InjectDictionaryAttribute1 : Attribute { }

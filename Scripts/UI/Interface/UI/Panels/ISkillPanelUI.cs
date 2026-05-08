@@ -1,8 +1,8 @@
 public interface ISkillPanelUI : IPanel
 {
-    void UpdateSkillsButtonText(); // Метод для обновления текста кнопки
+    void UpdateSkillsButtonText();
     void UnlockPanel(string panelName);
-    void ClearPanelButtons(); // Метод для очистки старых кнопок
-    void CreatePanelButtons(); // Метод для пересоздания кнопок
-    void TogglePanelSelection(); // Метод для переключения панели выбора
+    void ClearPanelButtons();
+    void CreatePanelButtons();
+    void TogglePanelSelection();
 }

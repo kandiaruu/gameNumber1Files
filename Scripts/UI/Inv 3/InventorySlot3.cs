@@ -1,3 +1,9 @@
+//
+// Represents a single slot in the inventory grid. Stores the item ID, stack size,
+// timestamps, and equipped state for one entry, updates the slot's icon and stack
+// count label to match, and forwards right-click events to InventoryPanel3.
+//
+
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -20,11 +26,13 @@ public class InventorySlot3 : MonoBehaviour, IPointerClickHandler
     private ItemDatabase3 itemDatabase;
     public string itemInstanceId;
 
+    // Assigns the item database reference used for icon lookups
     public void SetDatabase(ItemDatabase3 db)
     {
         itemDatabase = db;
     }
 
+    // Stores the item data for this slot and refreshes the visual display
     public void SetItem(string instanceId, int newItemId, int stackSize, ItemDatabase3 db = null)
     {
         itemInstanceId = instanceId;
@@ -35,6 +43,7 @@ public class InventorySlot3 : MonoBehaviour, IPointerClickHandler
         UpdateVisual();
     }
 
+    // Updates the slot icon sprite and stack count label to reflect the current item data
     private void UpdateVisual()
     {
         if (itemImage != null)
@@ -63,22 +72,10 @@ public class InventorySlot3 : MonoBehaviour, IPointerClickHandler
         }
     }
 
+    // Forwards a right-click on this slot to the inventory panel's click handler
     public void OnPointerClick(PointerEventData eventData)
     {
-        
         if (eventData.button == PointerEventData.InputButton.Right)
             inventoryPanel.OnSlotLeftClick(this);
     }
-
-    // public void OnPointerClick(PointerEventData eventData)
-    // {
-    //      if (eventData.button == PointerEventData.InputButton.Left)
-    //     {
-    //         inventoryPanel.OnSlotLeftClick(this);
-    //     }
-    //     else if (eventData.button == PointerEventData.InputButton.Right)
-    //     {
-    //         inventoryPanel.OnSlotRightClick(this);
-    //     }
-    // }
 }

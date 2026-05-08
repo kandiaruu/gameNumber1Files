@@ -1,3 +1,9 @@
+//
+// RoomPrefabSet is a serializable data container that groups all dungeon room prefabs
+// in one place so DungeonBuilder can look up the correct NodeInstance prefab for
+// each RoomKind without scattered Inspector references.
+//
+
 using UnityEngine;
 
 [System.Serializable]

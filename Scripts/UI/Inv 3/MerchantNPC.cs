@@ -1,7 +1,11 @@
+//
+// Marker component that identifies a GameObject as a merchant NPC in the scene.
+// Currently contains no logic; intended as a placeholder for future merchant
+// behaviour such as greeting dialogue or shop inventory assignment.
+//
+
 using UnityEngine;
 
-// Простой скрипт-маркер, чтобы игрок мог понять, что это торговец
 public class MerchantNPC : MonoBehaviour
 {
-    // В будущем сюда можно добавить фразы для приветствия или ассортимент товаров
 }

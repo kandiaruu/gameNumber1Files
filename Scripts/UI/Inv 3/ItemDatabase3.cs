@@ -1,3 +1,9 @@
+//
+// ScriptableObject that acts as the central item registry. Stores an array of
+// ItemData definitions (id, name, description, icon, stackability, categories)
+// and provides a lookup method that constructs a runtime Item3 instance by ID.
+//
+
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "ItemDatabase3", menuName = "Inventory3/ItemDatabase3")]
@@ -16,6 +22,7 @@ public class ItemDatabase3 : ScriptableObject
 
     public ItemData[] items;
 
+    // Finds an item definition by ID and returns a new Item3 runtime instance, or logs an error and returns null if not found
     public Item3 GetItemById(int id, int stackSize = 1)
     {
         foreach (var itemData in items)
@@ -32,7 +39,7 @@ public class ItemDatabase3 : ScriptableObject
                 );
             }
         }
-        Debug.LogError($"Предмет с ID {id} не найден!");
+        Debug.LogError($"Item with ID {id} not found!");
         return null;
     }
 }

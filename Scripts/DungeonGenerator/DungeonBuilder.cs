@@ -1,3 +1,13 @@
+//
+// DungeonBuilder procedurally generates a dungeon floor in Unity.
+// Starting from a Start room it grows a main path and branching side paths,
+// placing corridors, single rooms, triple-junction rooms, dead-ends, and a
+// boss-portal room according to weighted random rolls and collision checks.
+// Each door that is not yet connected is temporarily capped with a dead-end
+// probe so overlap tests stay accurate. When generation is complete it
+// registers all spawned NodeInstances with DungeonVisibilityManager.
+//
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -27,7 +37,7 @@ public class DungeonBuilder : MonoBehaviour
     {
         public NodeInstance fromRoom;
         public DoorPortal fromDoor;
-        public int branchLength; // длина ветки
+        public int branchLength;
     }
 
     private class PendingDeadEnd
@@ -35,25 +45,23 @@ public class DungeonBuilder : MonoBehaviour
         public DoorPortal ownerDoor;
         public Vector3 position;
         public Quaternion rotation;
-        public NodeInstance instance; // живёт в сцене
+        public NodeInstance instance;
     }
 
     private readonly Dictionary<DoorPortal, PendingDeadEnd> pendingDeadEnds = new();
-
     private readonly Queue<OpenEnd> frontier = new();
     private readonly List<NodeInstance> spawnedRooms = new();
 
-        // 1) Новый ролл
+    // Randomly selects Corridor (33%), Single (17%), or Triple (50%) room type
     private RoomKind RollAnyKind()
     {
         double r = rng.NextDouble();
-        if (r < 0.33) return RoomKind.Corridor; // 50%
-        if (r < 0.50) return RoomKind.Single;   // 30%
-        return RoomKind.Triple;                 // 20%
+        if (r < 0.33) return RoomKind.Corridor;
+        if (r < 0.50) return RoomKind.Single;
+        return RoomKind.Triple;
     }
 
-    // В месте, где генеришь новые OpenEnd для triple:
-
+    // Returns true if a corridor followed by a dead-end can fit at the given open end without overlapping existing rooms
     private bool CanPlaceCorridorThenDeadEnd(OpenEnd end)
     {
         if (end == null || end.fromRoom == null || end.fromDoor == null)
@@ -78,7 +86,6 @@ public class DungeonBuilder : MonoBehaviour
         Dbg($"[CHK] from={end.fromRoom.name}/{end.fromDoor.name}");
         Dbg($"[CHK] dir={dir}, socket={end.fromDoor.SocketPos}");
 
-        // PROBE 1: corridor
         NodeInstance corrProbe = Instantiate(prefabs.corridor, Vector3.zero, Quaternion.identity, GetRoot());
         corrProbe.name = "PROBE_Corridor";
         DoorPortal corrDoor = GetAnyDoor(corrProbe);
@@ -92,8 +99,7 @@ public class DungeonBuilder : MonoBehaviour
 
         AlignByAttach(corrProbe, end.fromDoor.SocketPos + dir * roomToCorridorOffset, dir);
 
-        bool corrBlocked = OverlapsPlacedNodes(
-            corrProbe, end.fromRoom, null);
+        bool corrBlocked = OverlapsPlacedNodes(corrProbe, end.fromRoom, null);
         Dbg($"[CHK] corridor pos={corrProbe.transform.position}, blocked={corrBlocked}");
         if (corrBlocked)
         {
@@ -102,13 +108,11 @@ public class DungeonBuilder : MonoBehaviour
             return false;
         }
 
-        // PROBE 2: deadend after corridor
         NodeInstance deadProbe = Instantiate(prefabs.deadEndRoom, Vector3.zero, Quaternion.identity, GetRoot());
         deadProbe.name = "PROBE_DeadEnd";
         AlignByAttach(deadProbe, corrDoor.SocketPos + dir * corridorToRoomOffset, dir);
 
-        bool deadBlocked = OverlapsPlacedNodes(
-            deadProbe, end.fromRoom, corrProbe);
+        bool deadBlocked = OverlapsPlacedNodes(deadProbe, end.fromRoom, corrProbe);
         Dbg($"[CHK] deadend pos={deadProbe.transform.position}, blocked={deadBlocked}");
 
         DestroyImmediate(deadProbe.gameObject);
@@ -124,6 +128,7 @@ public class DungeonBuilder : MonoBehaviour
         return true;
     }
 
+    // Returns true if a single room followed by a dead-end can fit at the given open end without overlapping existing rooms
     private bool CanPlaceSingleWithDeadEnd(OpenEnd end)
     {
         if (end == null || end.fromRoom == null || end.fromDoor == null) return false;
@@ -134,13 +139,11 @@ public class DungeonBuilder : MonoBehaviour
         dir.y = 0f;
         dir.Normalize();
 
-        // 1) single прямо после двери
         NodeInstance single = Instantiate(prefabs.singleRoom, Vector3.zero, Quaternion.identity, GetRoot());
         single.name = "PROBE_Single";
         AlignByAttach(single, end.fromDoor.SocketPos + dir * roomToCorridorOffset, dir);
 
-        bool singleBlocked = OverlapsPlacedNodes(
-            single, end.fromRoom, null);
+        bool singleBlocked = OverlapsPlacedNodes(single, end.fromRoom, null);
 
         Dbg($"[CHK-SINGLE] single blocked={singleBlocked}");
         if (singleBlocked)
@@ -150,7 +153,6 @@ public class DungeonBuilder : MonoBehaviour
             return false;
         }
 
-        // 2) тупик после двери single
         DoorPortal outDoor = GetAnyDoor(single);
         if (outDoor == null)
         {
@@ -168,8 +170,7 @@ public class DungeonBuilder : MonoBehaviour
         dead.name = "PROBE_Single_DeadEnd";
         AlignByAttach(dead, outDoor.SocketPos + outDir * roomToCorridorOffset, outDir);
 
-        bool deadBlocked = OverlapsPlacedNodes(
-            dead, single, null);
+        bool deadBlocked = OverlapsPlacedNodes(dead, single, null);
 
         Dbg($"[CHK-SINGLE] dead blocked={deadBlocked}");
 
@@ -186,6 +187,7 @@ public class DungeonBuilder : MonoBehaviour
         return true;
     }
 
+    // Returns true if a triple room with a dead-end at every exit can fit at the given open end without overlapping
     private bool CanPlaceTripleWithDeadEndsAll3(OpenEnd end)
     {
         if (end == null || end.fromRoom == null || end.fromDoor == null) return false;
@@ -196,13 +198,11 @@ public class DungeonBuilder : MonoBehaviour
         dir.y = 0f;
         dir.Normalize();
 
-        // 1) triple прямо после двери
         NodeInstance triple = Instantiate(prefabs.tripleRoom, Vector3.zero, Quaternion.identity, GetRoot());
         triple.name = "PROBE_Triple";
         AlignByAttach(triple, end.fromDoor.SocketPos + dir * roomToCorridorOffset, dir);
 
-        bool tripleBlocked = OverlapsPlacedNodes(
-            triple, end.fromRoom, null);
+        bool tripleBlocked = OverlapsPlacedNodes(triple, end.fromRoom, null);
 
         Dbg($"[CHK-TRIPLE] triple blocked={tripleBlocked}");
         if (tripleBlocked)
@@ -212,7 +212,6 @@ public class DungeonBuilder : MonoBehaviour
             return false;
         }
 
-        // 2) список дверей triple
         List<DoorPortal> doors = GetAllDoors(triple);
         if (doors.Count == 0)
         {
@@ -221,7 +220,6 @@ public class DungeonBuilder : MonoBehaviour
             return false;
         }
 
-        // 3) для каждой двери triple — тупик
         for (int i = 0; i < doors.Count; i++)
         {
             DoorPortal d = doors[i];
@@ -241,8 +239,7 @@ public class DungeonBuilder : MonoBehaviour
             dead.name = $"PROBE_Triple_Dead_{i}";
             AlignByAttach(dead, d.SocketPos + ddir * roomToCorridorOffset, ddir);
 
-            bool deadBlocked = OverlapsPlacedNodes(
-                dead, triple, null);
+            bool deadBlocked = OverlapsPlacedNodes(dead, triple, null);
 
             Dbg($"[CHK-TRIPLE] branch={i} dead blocked={deadBlocked}");
             DestroyImmediate(dead.gameObject);
@@ -260,40 +257,39 @@ public class DungeonBuilder : MonoBehaviour
         return true;
     }
 
-private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
-{
-    if (door == null) return;
-
-    if (pendingDeadEnds.ContainsKey(door))
-        RemoveAndDestroy(door);
-
-    Vector3 pos = door.SocketPos + dir * roomToCorridorOffset;
-    NodeInstance inst = Instantiate(prefabs.deadEndRoom, Vector3.zero, Quaternion.identity, GetRoot());
-    inst.name = $"PendingDead_{deadEndIndex++}";
-    AlignByAttach(inst, pos, dir);
-    Physics.SyncTransforms();
-
-    // --- СВЯЗЫВАЕМ ТУПИК С РОДИТЕЛЕМ ---
-    NodeInstance parentRoom = door.owner;
-    if (parentRoom != null)
+    // Spawns a temporary dead-end prefab at a door's socket position, registers it as a pending cap, and establishes neighbor links
+    private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
     {
-        parentRoom.AddNeighbor(inst); // Комната видит тупик
-        inst.AddNeighbor(parentRoom); // Тупик видит комнату
+        if (door == null) return;
+
+        if (pendingDeadEnds.ContainsKey(door))
+            RemoveAndDestroy(door);
+
+        Vector3 pos = door.SocketPos + dir * roomToCorridorOffset;
+        NodeInstance inst = Instantiate(prefabs.deadEndRoom, Vector3.zero, Quaternion.identity, GetRoot());
+        inst.name = $"PendingDead_{deadEndIndex++}";
+        AlignByAttach(inst, pos, dir);
+        Physics.SyncTransforms();
+
+        NodeInstance parentRoom = door.owner;
+        if (parentRoom != null)
+        {
+            parentRoom.AddNeighbor(inst);
+            inst.AddNeighbor(parentRoom);
+        }
+
+        pendingDeadEnds[door] = new PendingDeadEnd
+        {
+            ownerDoor = door,
+            position = inst.transform.position,
+            rotation = inst.transform.rotation,
+            instance = inst
+        };
+
+        Debug.Log($"[REGISTERERED] {inst.name}, owner={door.owner?.name}");
     }
-    // ----------------------------------
 
-    pendingDeadEnds[door] = new PendingDeadEnd
-    {
-        ownerDoor = door,
-        position = inst.transform.position,
-        rotation = inst.transform.rotation,
-        instance = inst
-    };
-
-    Debug.Log($"[REGISTERERED] {inst.name}, owner={door.owner?.name}");
-}
-
-    // Удаляет тупик из сцены и из списка, возвращает данные для респавна
+    // Removes the pending dead-end associated with a door from the scene and the dictionary, returning its data for potential re-spawn
     private PendingDeadEnd PopPendingDeadEnd(DoorPortal door)
     {
         if (door == null || !pendingDeadEnds.TryGetValue(door, out var pending)) return null;
@@ -306,15 +302,14 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         return pending;
     }
 
-    // Респавнит тупик на то же место (проверка не прошла)
+    // Re-instantiates a dead-end at its original position and rotation (used when a placement check fails), adding it to spawnedRooms and re-linking neighbors
     private void RespawnDeadEnd(PendingDeadEnd pending)
     {
         if (pending == null) return;
         NodeInstance inst = Instantiate(prefabs.deadEndRoom, pending.position, pending.rotation, GetRoot());
         inst.name = $"FinalDead_{deadEndIndex++}";
-        spawnedRooms.Add(inst); 
-        
-        // --- СВЯЗЫВАЕМ ФИНАЛЬНЫЙ ТУПИК ---
+        spawnedRooms.Add(inst);
+
         NodeInstance parentRoom = pending.ownerDoor.owner;
         if (parentRoom != null)
         {
@@ -325,6 +320,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         Physics.SyncTransforms();
     }
 
+    // Destroys the pending dead-end instance for a door and removes it from the dictionary
     private void RemoveAndDestroy(DoorPortal door)
     {
         if (pendingDeadEnds.TryGetValue(door, out var p))
@@ -334,6 +330,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         }
     }
 
+    // Tests whether any BoxCollider of the probe overlaps a placed NodeInstance, ignoring the probe itself and up to two explicitly ignored rooms
     private bool OverlapsPlacedNodes(
         NodeInstance probe,
         NodeInstance ignoreA = null,
@@ -370,32 +367,34 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
                 if (h.GetComponentInParent<DoorPortal>() != null) continue;
                 if (h.GetComponentInParent<DoorInteractable>() != null) continue;
 
-                Dbg($"[BLOCKED] probe={probe.name} заблокирован объектом={h.name}, parent={h.transform.parent?.name}");
+                Dbg($"[BLOCKED] probe={probe.name} blocked by={h.name}, parent={h.transform.parent?.name}");
                 return true;
             }
         }
         return false;
     }
 
+    // Logs a message only when verbosePlacementDebug is enabled
     private void Dbg(string msg)
     {
         if (verbosePlacementDebug) Debug.Log(msg);
     }
+
+    // Sets the generation root to the given floor folder, notifies DungeonVisibilityManager of the map folder, then runs Build()
     public void BuildInFolder(Transform newRoot, Transform mapFolder)
     {
-        this.root = newRoot; // Устанавливаем текущую папку этажа как корень[cite: 14]
-        
-        // Передаем текущую папку карты в менеджер видимости
+        this.root = newRoot;
+
         var vis = FindFirstObjectByType<DungeonVisibilityManager>();
-        if (vis != null) 
+        if (vis != null)
         {
-            vis.SetCurrentMapContainer(mapFolder); 
+            vis.SetCurrentMapContainer(mapFolder);
         }
 
-        Build(); // Запускаем генерацию в новую папку[cite: 14]
+        Build();
     }
 
-    // Теперь этот метод чистит только списки, но не удаляет объекты в сцене
+    // Clears the frontier, spawned-room list, and pending dead-end dictionary without destroying scene objects
     public void ClearLists()
     {
         frontier.Clear();
@@ -403,12 +402,13 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         pendingDeadEnds.Clear();
     }
 
-    // Позволяет FloorManager найти список комнат
+    // Returns the list of all NodeInstances that have been spawned during the current generation pass
     public List<NodeInstance> GetSpawnedRooms()
     {
-        return spawnedRooms; // spawnedRooms уже есть в твоем коде[cite: 13]
+        return spawnedRooms;
     }
 
+    // Entry point for dungeon generation: seeds the RNG, builds the main path then side branches, force-places a portal if none was placed, and registers all rooms with the visibility manager
     public void Build()
     {
         ClearLists();
@@ -420,11 +420,9 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
 
         int maxRooms = Mathf.Max(2, config.maxRooms);
         int maxBranchLength = Mathf.Max(2, Mathf.RoundToInt(Mathf.Sqrt(maxRooms)));
-        //Mathf.Sqrt(maxRooms))
         float portalFrac = 0.75f;
         int portalTarget = Mathf.Clamp(Mathf.RoundToInt(maxRooms * portalFrac), 2, maxRooms - 1);
 
-        // 1) Start
         NodeInstance start = SpawnRoom(prefabs.startRoom, RoomKind.Start, Vector3.zero, Quaternion.identity);
         if (start == null) return;
 
@@ -435,7 +433,6 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
             return;
         }
 
-        // Главная ветка — специальная очередь
         var mainFrontier = new Queue<OpenEnd>();
         mainFrontier.Enqueue(new OpenEnd { fromRoom = start, fromDoor = startDoor, branchLength = 1 });
 
@@ -443,7 +440,6 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         int safety = 100000;
         int corSeqCount = 0;
 
-        // 2) Генерация main path до maxBranchLength
         while (mainFrontier.Count > 0 && spawnedRooms.Count < maxRooms && safety-- > 0)
         {
             int maxBranchLength1 = 0;
@@ -457,12 +453,11 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
                 Debug.Log($"[MAINFRONTIER] room={roomName1}, door={doorName1}, side={doorType1}, branchLength={openEnd.branchLength}");
             }
             OpenEnd end = mainFrontier.Dequeue();
-            Debug.Log($"[DBG] MainPath длина {end.branchLength}, лимит {maxBranchLength} side {maxBranchLength1}");
+            Debug.Log($"[DBG] MainPath length {end.branchLength}, limit {maxBranchLength} side {maxBranchLength1}");
 
             if (end.branchLength >= maxBranchLength)
             {
-                Debug.Log($"[DBG] MainPath достиг лимита ({end.branchLength}/{maxBranchLength}), ставим тупик у {end.fromRoom.name}");
-                // ExpandFromEnd(end, RoomKind.DeadEnd, enqueueExits: false, countAsRoom: false);
+                Debug.Log($"[DBG] MainPath reached limit ({end.branchLength}/{maxBranchLength}), placing dead-end at {end.fromRoom.name}");
                 break;
             }
             RoomKind nextKind;
@@ -488,8 +483,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
 
             if (!canPlace)
             {
-                Debug.Log($"[BUILD] check FAILED for {nextKind}, place DeadEnd");
-                // ExpandFromEnd(end, RoomKind.DeadEnd, enqueueExits: false, countAsRoom: false);
+                Debug.Log($"[BUILD] check FAILED for {nextKind}, placing dead-end");
                 corSeqCount = 0;
                 continue;
             }
@@ -498,34 +492,26 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
                 corSeqCount++;
             }
             Debug.Log($"[BUILD] check OK for {nextKind}");
-            // **ExpandFromEnd теперь должен добавить новые выходы в sideFrontier**
-            
             ExpandFromEndMain(end, nextKind, enqueueExits: true, countAsRoom: true, mainFrontier: mainFrontier, sideFrontier: sideFrontier);
             if (nextKind == RoomKind.Corridor) corSeqCount++; else corSeqCount = 0;
             if (nextKind == RoomKind.Portal) portalPlaced = true;
         }
         if (mainFrontier.Count == 0)
-        Debug.Log("[BUILD][EXIT] Причина: mainFrontier пустой, больше нечего строить по основным веткам.");
+            Debug.Log("[BUILD][EXIT] Reason: mainFrontier empty.");
         else if (spawnedRooms.Count >= maxRooms)
-            Debug.Log("[BUILD][EXIT] Причина: достигнут лимит комнат maxRooms.");
+            Debug.Log("[BUILD][EXIT] Reason: maxRooms reached.");
         else if (safety <= 0)
-            Debug.Log("[BUILD][EXIT] Причина: достигнут лимит safety — возможная ошибка или бесконечный цикл.");
+            Debug.Log("[BUILD][EXIT] Reason: safety limit hit — possible infinite loop.");
 
-        // 3) После главной ветки — остальные ветки
         safety = 100000;
         while (sideFrontier.Count > 0 && spawnedRooms.Count < maxRooms && safety-- > 0)
         {
-            // while (sideFrontier.Count > 0)
-            // {
-            //     OpenEnd item = sideFrontier.Dequeue();
-            //     Build1(item);
-            // }
             OpenEnd end = sideFrontier.Dequeue();
             string roomName = end.fromRoom != null ? end.fromRoom.name : "null";
             string doorType = end.fromDoor != null ? end.fromDoor.sideType.ToString() : "null";
             string doorName = end.fromDoor != null ? end.fromDoor.name : "null";
-            Debug.Log($"[SIDEFRONTIER] НАЧАЛО: room={roomName}, door={doorName}, side={doorType}, branchLength={end.branchLength}");
-            Debug.Log($"[DBG] SidePath длина {end.branchLength}, лимит {maxBranchLength}");
+            Debug.Log($"[SIDEFRONTIER] START: room={roomName}, door={doorName}, side={doorType}, branchLength={end.branchLength}");
+            Debug.Log($"[DBG] SidePath length {end.branchLength}, limit {maxBranchLength}");
 
             RoomKind nextKind;
             if (!portalPlaced && spawnedRooms.Count >= portalTarget)
@@ -551,8 +537,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
 
             if (!canPlace)
             {
-                Debug.Log($"[BUILD] check FAILED for {nextKind}, place DeadEnd");
-                // ExpandFromEnd(end, RoomKind.DeadEnd, enqueueExits: false, countAsRoom: false, mainFrontier: null, sideFrontier: sideFrontier);
+                Debug.Log($"[BUILD] check FAILED for {nextKind}, placing dead-end");
                 corSeqCount = 0;
                 continue;
             }
@@ -566,17 +551,16 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
             if (nextKind == RoomKind.Corridor) corSeqCount++; else corSeqCount = 0;
             if (nextKind == RoomKind.Portal) portalPlaced = true;
 
-            Debug.Log($"[SIDEFRONTIER] Текущий состав очереди sideFrontier (Count={sideFrontier.Count}):");
-                foreach (var end1 in sideFrontier)
-                {
-                    string roomName1 = end1.fromRoom != null ? end1.fromRoom.name : "null";
-                    string doorType1 = end1.fromDoor != null ? end1.fromDoor.sideType.ToString() : "null";
-                    string doorName1 = end1.fromDoor != null ? end1.fromDoor.name : "null";
-                    Debug.Log($"[SIDEFRONTIER] room={roomName1}, door={doorName1}, side={doorType1}, branchLength={end.branchLength}");
-                }
+            Debug.Log($"[SIDEFRONTIER] Current queue (Count={sideFrontier.Count}):");
+            foreach (var end1 in sideFrontier)
+            {
+                string roomName1 = end1.fromRoom != null ? end1.fromRoom.name : "null";
+                string doorType1 = end1.fromDoor != null ? end1.fromDoor.sideType.ToString() : "null";
+                string doorName1 = end1.fromDoor != null ? end1.fromDoor.name : "null";
+                Debug.Log($"[SIDEFRONTIER] room={roomName1}, door={doorName1}, side={doorType1}, branchLength={end.branchLength}");
+            }
         }
 
-        // 4) Если портал не поставлен — форсируем на первой доступной ветке
         if (!portalPlaced && sideFrontier.Count > 0 && spawnedRooms.Count < maxRooms)
         {
             var end = sideFrontier.Dequeue();
@@ -592,7 +576,6 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
             }
         }
 
-        // Собираем все выжившие "временные" тупики в общий список
         foreach (var pending in pendingDeadEnds.Values)
         {
             if (pending.instance != null && !spawnedRooms.Contains(pending.instance))
@@ -606,28 +589,29 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         if (vis != null) vis.RegisterRooms(spawnedRooms);
     }
 
+    // Randomly picks Single (60%) or Triple (40%), never Corridor
     private RoomKind RollAnyKindExceptCorridor()
     {
         double r = rng.NextDouble();
-        if (r < 0.60) return RoomKind.Single;   // single 60%
-        else return RoomKind.Triple;            // triple 40%
+        if (r < 0.60) return RoomKind.Single;
+        else return RoomKind.Triple;
     }
 
+    // Randomly picks Corridor (60%) or Single (40%), never Triple
     private RoomKind RollAnyKindExceptTriple()
-        {
-            double r = rng.NextDouble();
-            if (r < 0.60) return RoomKind.Corridor;   // single 60%
-            else return RoomKind.Single; 
-        }
+    {
+        double r = rng.NextDouble();
+        if (r < 0.60) return RoomKind.Corridor;
+        else return RoomKind.Single;
+    }
 
+    // Placeholder portal-placement check; always returns true (reserved for full implementation)
     private bool CanPlacePortalWithDeadEndsAll3(OpenEnd end)
     {
-        // Просто используй ту же логику, что для Triple, но с prefab.portalRoom
-        // (можно скопировать CanPlaceTripleWithDeadEndsAll3, сменить prefabs.tripleRoom на prefabs.portalRoom)
-        // Если надо — дай знать, дам полностью этот метод!
-        return true; // пока что для теста
+        return true;
     }
 
+    // Instantiates the prefab for the given room kind at the open end, aligns it, links neighbors, enqueues exits into sideFrontier, registers pending dead-ends on all doors, and tracks the room in spawnedRooms
     private void ExpandFromEnd(OpenEnd end, RoomKind kind, bool enqueueExits = true, bool countAsRoom = true, Queue<OpenEnd> mainFrontier = null, Queue<OpenEnd> sideFrontier = null)
     {
         if (end == null || end.fromRoom == null || end.fromDoor == null) return;
@@ -652,7 +636,6 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
             node.AddNeighbor(end.fromRoom);
         }
 
-        // Добавляем выходы только в sideFrontier!
         if (enqueueExits && sideFrontier != null)
             EnqueueLogicalExits(node, kind, end.branchLength, sideFrontier);
 
@@ -681,6 +664,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         Physics.SyncTransforms();
     }
 
+    // Same as ExpandFromEnd but also advances the main path frontier; used when building the primary corridor chain
     private void ExpandFromEndMain(OpenEnd end, RoomKind kind, bool enqueueExits = true, bool countAsRoom = true, Queue<OpenEnd> mainFrontier = null, Queue<OpenEnd> sideFrontier = null)
     {
         if (end == null || end.fromRoom == null || end.fromDoor == null) return;
@@ -701,13 +685,12 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
 
         DoorPortal nodeDoor = GetForwardDoor(node);
 
-        // <--- ИСПРАВЛЕНИЕ: Соседство ставим безусловно --->
         if (end.fromRoom != null)
         {
             end.fromRoom.AddNeighbor(node);
             node.AddNeighbor(end.fromRoom);
         }
-        // Перед использованием end, fromRoom, fromDoor, node, nodeDoor, mainFrontier:
+
         if (end == null)
             Debug.LogError("[ExpandFromEndMain] end == null!");
         else if (end.fromRoom == null)
@@ -727,16 +710,16 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
 
         if (end == null || end.fromRoom == null || end.fromDoor == null || prefab == null || node == null || node.portals == null || mainFrontier == null || nodeDoor == null)
         {
-            Debug.LogError("[ExpandFromEndMain] ОПАСНО: какой-то из объектов == null, дальнейшее выполнение прекращено!");
+            Debug.LogError("[ExpandFromEndMain] Critical null detected, aborting!");
             return;
         }
 
         mainFrontier.Enqueue(new OpenEnd {
-                fromRoom = node,
-                fromDoor = nodeDoor,
-                branchLength = end.branchLength + 1
-            });
-        
+            fromRoom = node,
+            fromDoor = nodeDoor,
+            branchLength = end.branchLength + 1
+        });
+
         if (enqueueExits && sideFrontier != null)
             EnqueueLogicalExitsLeftRight(node, kind, 0, sideFrontier);
 
@@ -764,17 +747,18 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         Physics.SyncTransforms();
     }
 
+    // Returns the snap offset distance to use when placing a room of the given kind
     private float GetRoomOffset(RoomKind kind)
     {
-        // Нужно подкорректировать значения под твои префабы!
         switch (kind)
         {
-            case RoomKind.Corridor: return roomToCorridorOffset; // corridor
-            case RoomKind.DeadEnd:  return roomToCorridorOffset; // deadend сразу к двери
-            default: return roomToCorridorOffset; // или твой corridorToRoomOffset для обычных комнат если нужно больше
+            case RoomKind.Corridor: return roomToCorridorOffset;
+            case RoomKind.DeadEnd:  return roomToCorridorOffset;
+            default: return roomToCorridorOffset;
         }
     }
 
+    // Enqueues all logical exit doors of a room into the target frontier queue
     private void EnqueueLogicalExits(NodeInstance room, RoomKind kind, int branchLength, Queue<OpenEnd> targetFrontier)
     {
         Debug.Log($"[EnqueueLogicalExits] {room} {kind}");
@@ -784,7 +768,6 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         List<DoorPortal> doors = GetAllDoors(room);
         if (doors.Count == 0) return;
 
-        // Для Triple все выходы — ветки!
         for (int i = 0; i < Mathf.Min(exits, doors.Count); i++)
         {
             targetFrontier.Enqueue(new OpenEnd {
@@ -795,6 +778,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         }
     }
 
+    // Enqueues only the Left and Right exit doors of a Triple room into the target frontier, used when building side branches off the main path
     private void EnqueueLogicalExitsLeftRight(NodeInstance room, RoomKind kind, int branchLength, Queue<OpenEnd> targetFrontier)
     {
         int exits = GetLogicalExitCount(kind);
@@ -805,7 +789,6 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
 
         if (kind == RoomKind.Triple)
         {
-            // Только Left и Right
             foreach (var door in doors)
             {
                 if (door == null) continue;
@@ -820,8 +803,8 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
             }
         }
     }
-    // По твоим правилам:
-    // DeadEnd=0, Single=1, Start=1, Portal=3, Triple=3
+
+    // Returns the number of logical exits for a given room kind (DeadEnd=0, Single/Start=1, Portal/Triple=3)
     private int GetLogicalExitCount(RoomKind kind)
     {
         return kind switch
@@ -835,6 +818,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         };
     }
 
+    // Instantiates a room prefab at the given position/rotation, assigns its kind and a sequential name, and adds it to spawnedRooms
     private NodeInstance SpawnRoom(NodeInstance prefab, RoomKind kind, Vector3 pos, Quaternion rot)
     {
         NodeInstance n = Instantiate(prefab, pos, rot, GetRoot());
@@ -846,6 +830,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         return n;
     }
 
+    // Returns the first non-null DoorPortal found on the given NodeInstance
     private DoorPortal GetAnyDoor(NodeInstance n)
     {
         if (n == null || n.portals == null) return null;
@@ -854,6 +839,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         return null;
     }
 
+    // Returns the first DoorPortal whose sideType is Forward on the given NodeInstance
     private DoorPortal GetForwardDoor(NodeInstance n)
     {
         if (n == null || n.portals == null) return null;
@@ -865,6 +851,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         return null;
     }
 
+    // Returns all non-null DoorPortals on the given NodeInstance as a list
     private List<DoorPortal> GetAllDoors(NodeInstance n)
     {
         var list = new List<DoorPortal>();
@@ -874,6 +861,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         return list;
     }
 
+    // Rotates and positions the instance so its attachFromSide faces targetForward and its socket lands at targetPos
     private void AlignByAttach(NodeInstance inst, Vector3 targetPos, Vector3 targetForward)
     {
         Transform r = inst.transform;
@@ -897,6 +885,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         r.rotation = Quaternion.Euler(0f, e.y, 0f);
     }
 
+    // Returns the NodeInstance prefab that corresponds to the given RoomKind
     private NodeInstance PickPrefab(RoomKind kind)
     {
         return kind switch
@@ -911,6 +900,7 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         };
     }
 
+    // Returns false and logs an error if config, prefabs, or any individual room prefab reference is missing
     private bool ValidateRefs()
     {
         if (config == null || prefabs == null)
@@ -929,13 +919,15 @@ private void RegisterPendingDeadEnd(DoorPortal door, Vector3 dir)
         return true;
     }
 
+    // Returns the designated root transform, falling back to this MonoBehaviour's own transform if none is set
     private Transform GetRoot() => root ? root : transform;
 
+    // Clears all queues, the spawned-room list, and destroys all child GameObjects under the root transform
     private void ClearChildren()
     {
         frontier.Clear();
         spawnedRooms.Clear();
-        pendingDeadEnds.Clear(); // ← добавить
+        pendingDeadEnds.Clear();
 
         Transform r = GetRoot();
         for (int i = r.childCount - 1; i >= 0; i--)

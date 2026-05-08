@@ -1,11 +1,16 @@
+//
+// Full-screen map panel that disables the minimap follow script while open.
+// Supports orthographic zoom via scroll wheel and free-look panning via left-mouse drag.
+//
+
 using UnityEngine;
-using UnityEngine.EventSystems; // Нужно для проверки, не кликаем ли мы по кнопкам UI
+using UnityEngine.EventSystems;
 
 public class MapPanel : BasePanel
 {
     [Header("References")]
     [SerializeField] private Camera mapCamera;
-    [SerializeField] private MinimapController followScript; // Перетащи сюда камеру (где висит скрипт слежения)
+    [SerializeField] private MinimapController followScript;
 
     [Header("Zoom Settings")]
     [SerializeField] private float minFullMapSize = 50f;
@@ -14,16 +19,16 @@ public class MapPanel : BasePanel
 
     [Header("Panning Settings")]
     [SerializeField] private float dragSpeed = 2f;
-    
+
     private Vector3 dragOrigin;
     private bool isDragging;
 
+    // Disables the minimap follow script and centres the map camera over the player
     public override void Open()
     {
         base.Open();
-        if (followScript != null) followScript.enabled = false; // Выключаем слежку за игроком
-        
-        // Ставим камеру над игроком в момент открытия
+        if (followScript != null) followScript.enabled = false;
+
         if (mapCamera != null && followScript.player != null)
         {
             Vector3 pPos = followScript.player.position;
@@ -31,12 +36,14 @@ public class MapPanel : BasePanel
         }
     }
 
+    // Re-enables the minimap follow script when the map is closed
     public override void Close()
     {
-        if (followScript != null) followScript.enabled = true; // Возвращаем слежку
+        if (followScript != null) followScript.enabled = true;
         base.Close();
     }
 
+    // Each frame, processes zoom and panning input while the panel is open
     private void Update()
     {
         if (!IsOpen) return;
@@ -45,6 +52,7 @@ public class MapPanel : BasePanel
         HandlePanning();
     }
 
+    // Adjusts the camera's orthographic size based on the scroll wheel, clamped to min/max limits
     private void HandleZoom()
     {
         float scroll = Input.GetAxis("Mouse ScrollWheel");
@@ -55,7 +63,8 @@ public class MapPanel : BasePanel
         }
     }
 
-        private void HandlePanning()
+    // Translates the map camera in world space based on left-mouse drag delta, scaled by zoom level and DPI setting
+    private void HandlePanning()
     {
         if (Input.GetMouseButtonDown(0))
         {
@@ -72,18 +81,11 @@ public class MapPanel : BasePanel
         if (isDragging)
         {
             Vector3 currentMousePos = Input.mousePosition;
-            
-            // ИСПРАВЛЕНО: Поменяли местами currentMousePos и dragOrigin, 
-            // чтобы убрать инверсию (тянешь вниз = карта едет вниз)
-            Vector3 difference = currentMousePos - dragOrigin; 
-            
-            // Читаем DPI (чувствительность) из настроек. Если нет, берем 1f.
-            float dpiMultiplier = PlayerPrefs.GetFloat("MapDragDPI", 1f);
+            Vector3 difference = currentMousePos - dragOrigin;
 
-            // Считаем скорость: базовая * фактор зума * DPI
+            float dpiMultiplier = PlayerPrefs.GetFloat("MapDragDPI", 1f);
             float moveFactor = (mapCamera.orthographicSize / 500f) * dragSpeed * dpiMultiplier;
 
-            // Двигаем камеру
             Vector3 move = new Vector3(difference.x * moveFactor, 0, difference.y * moveFactor);
             mapCamera.transform.Translate(move, Space.World);
 
